@@ -1,6 +1,5 @@
 # Grupo 4 — Detección de anomalías en maquinaria
 
-Este es un proyecto de Machine Learning y MLOps realizado por **Byron y Dayana**.
 
 La idea es analizar las condiciones de funcionamiento de una máquina y detectar comportamientos extraños que puedan estar relacionados con una falla.
 
