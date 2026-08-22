@@ -1,186 +1,200 @@
+# Guía sencilla para trabajar con Git y GitHub
 
+Esta guía explica cómo Byron y Dayana deben trabajar en el proyecto.
 
-## ¿Qué son Git y GitHub?
+## Conceptos básicos
 
-- **Git** guarda el historial de los cambios realizados en los archivos.
-- **GitHub** permite guardar el repositorio en internet y compartirlo con otra persona.
-- Un **commit** es un punto de guardado con una descripción.
-- Una **rama** es un espacio separado donde una persona puede trabajar sin afectar el trabajo estable.
+- **Git** guarda el historial de los cambios.
+- **GitHub** permite compartir el repositorio.
+- Un **commit** es un punto de guardado.
+- Una **rama** permite trabajar sin afectar la versión estable.
 - Un **push** envía los commits a GitHub.
-- Un **pull** descarga los cambios de GitHub.
-- Un **Pull Request** solicita unir una rama con otra.
+- Un **pull** descarga cambios desde GitHub.
+- Un **Pull Request** solicita integrar una rama con otra.
 
-## Las ramas del equipo
+## Ramas del proyecto
 
-El repositorio tiene tres ramas:
+El proyecto utiliza tres tipos de ramas:
 
 | Rama | Uso |
 |---|---|
-| `main` | Versión revisada, estable y lista para demostrar. |
-| `Byron` | Rama donde trabaja Byron. |
-| `Dayana` | Rama donde trabaja Dayana. |
+| `main` | Versión estable y lista para demostrar. |
+| `develop` | Reúne funcionalidades revisadas. |
+| `feature/<tarea>` | Trabajo de una funcionalidad específica. |
 
-No se debe trabajar directamente en `main`. Cada integrante realiza sus cambios en su propia rama y después solicita unirlos mediante un Pull Request.
+Ejemplos:
 
-## Configuración inicial
-
-Cada integrante debe clonar el repositorio en su propia computadora:
-
-```bash
-git clone <URL_DEL_REPOSITORIO>
-cd "Proyecto Integrador"
+```text
+feature/data-ingestion
+feature/data-validation
+feature/data-cleaning
+feature/model
+feature/mlflow
+feature/api
+feature/monitoring
 ```
 
-Después debe configurar su nombre y correo. Estos datos permiten saber quién hizo cada cambio:
+No se trabaja directamente en `main` ni en `develop`.
 
-```bash
+Cada integrante crea una rama `feature/...` desde `develop`.
+
+## Flujo de trabajo
+
+```text
+feature/<tarea>
+       ↓
+Pull Request
+       ↓
+develop
+       ↓
+Pull Request
+       ↓
+main
+```
+
+## Antes de comenzar una tarea
+
+Cambiar a `develop`:
+
+```powershell
+git switch develop
+```
+
+Descargar los últimos cambios:
+
+```powershell
+git pull origin develop
+```
+
+Crear una rama para la tarea:
+
+```powershell
+git switch -c feature/nombre-de-la-tarea
+```
+
+Ejemplo:
+
+```powershell
+git switch -c feature/data-validation
+```
+
+## Guardar cambios
+
+Revisar los archivos modificados:
+
+```powershell
+git status
+```
+
+Agregar únicamente los archivos relacionados con la tarea:
+
+```powershell
+git add src/validation tests/data README.md
+```
+
+Crear un commit descriptivo:
+
+```powershell
+git commit -m "feat: agregar reglas de validación de datos"
+```
+
+Enviar la rama a GitHub:
+
+```powershell
+git push -u origin feature/data-validation
+```
+
+## Crear el Pull Request
+
+En GitHub:
+
+1. Entrar en **Pull requests**.
+2. Presionar **New pull request**.
+3. En `base`, seleccionar `develop`.
+4. En `compare`, seleccionar la rama `feature/...`.
+5. Explicar qué se implementó y cómo se verificó.
+6. Crear el Pull Request.
+7. Solicitar revisión al otro integrante.
+8. Integrar después de la revisión.
+
+Cuando `develop` tenga una etapa estable, se crea otro Pull Request:
+
+```text
+base: main
+compare: develop
+```
+
+## Participación de los integrantes
+
+No se necesitan ramas llamadas `Byron` o `Dayana`.
+
+Git y GitHub registran la participación mediante:
+
+- El autor de cada commit.
+- La persona que crea el Pull Request.
+- La persona que revisa y aprueba.
+- Los comentarios y discusiones.
+- El historial de integraciones.
+
+Cada integrante debe configurar su propia identidad:
+
+```powershell
 git config user.name "Nombre Apellido"
 git config user.email "correo@example.com"
 ```
 
-Byron debe cambiar a su rama con:
-
-```bash
-git switch Byron
-```
-
-Dayana debe utilizar:
-
-```bash
-git switch Dayana
-```
-
-
-
-### 1. Entrar en la rama personal
-
-```bash
-git switch Byron
-```
-
-### 2. Descargar los últimos cambios de esa rama
-
-```bash
-git pull origin Byron
-```
-
-### 3. Modificar o crear los archivos necesarios
-
-Se trabaja normalmente con el editor de código. Antes de guardar en Git, se puede revisar qué cambió:
-
-```bash
-git status
-```
-
-### 4. Preparar los archivos
-
-Para preparar todos los cambios:
-
-```bash
-git add .
-```
-
-Es recomendable ejecutar nuevamente `git status` y comprobar que no aparezcan el dataset, contraseñas o archivos innecesarios.
-
-### 5. Crear un punto de guardado
-
-```bash
-git commit -m "data: agregar validación del dataset"
-```
-
-El mensaje debe explicar brevemente qué se hizo.
-
-### 6. Enviar el cambio a GitHub
-
-```bash
-git push origin Byron
-```
-
-## Cómo unir el trabajo con `main`
-
-Después de subir los cambios:
-
-1. Abrir el repositorio en GitHub.
-2. Entrar en **Pull requests**.
-3. Seleccionar **New pull request**.
-4. En `base`, elegir `main`.
-5. En `compare`, elegir `Byron` o `Dayana`.
-6. Escribir un título que explique el cambio.
-7. Seleccionar **Create pull request**.
-8. La otra persona revisa los archivos.
-9. Si todo funciona, seleccionar **Merge pull request**.
-
-De esta manera, GitHub conserva evidencia de quién hizo el cambio y quién lo revisó.
-
-## Actualizar la rama personal después de un Pull Request
-
-Cuando un cambio ya fue integrado en `main`, se puede actualizar la rama personal así:
-
-```bash
-git switch main
-git pull origin main
-git switch Byron
-git merge main
-git push origin Byron
-```
-
 ## Mensajes de commit
 
-Utilizaremos mensajes cortos y claros:
+Los mensajes deben explicar el cambio:
 
 ```text
-data: agregar descarga del dataset
-data: validar columnas obligatorias
-model: entrenar Isolation Forest
-test: probar respuesta de la API
-docs: explicar cómo ejecutar Docker
-monitor: agregar cálculo de drift
-fix: corregir error de tipo de dato
+feat: agregar validación automática del esquema
+fix: corregir lectura de categorías desconocidas
+data: agregar ingesta reproducible de AI4I
+model: registrar Isolation Forest en MLflow
+api: agregar endpoint de predicción
+monitor: agregar detección de drift con PSI
+test: comprobar respuesta para un input inválido
+docs: documentar ejecución con Docker
 ```
 
-No utilizar mensajes como:
+No utilizar:
 
 ```text
 cambio
 final
 final2
-ahora si
+ahora_si
 prueba
 ```
 
 ## Archivos que no deben subirse
 
-No se deben subir a GitHub:
+No se deben subir:
 
-- El archivo `ai4i2020.csv`.
-- Datos procesados o batches de producción.
-- Contraseñas, tokens o archivos `.env`.
+- `ai4i2020.csv`.
+- Datos procesados.
 - Modelos entrenados.
-- Carpetas locales de MLflow.
-- Entornos virtuales de Python.
+- Ejecuciones locales de MLflow.
+- Archivos `.env`.
+- Contraseñas o tokens.
+- La carpeta `.venv`.
 - Logs y archivos temporales.
 
-El archivo `.gitignore` está preparado para bloquear estos elementos.
+Antes de hacer un commit:
+
+```powershell
+git status
+```
 
 ## Si aparece un conflicto
 
-Un conflicto significa que dos personas modificaron la misma parte de un archivo. No se debe borrar trabajo ni usar `git push --force`.
+No utilizar `git push --force`.
 
-Lo recomendable es:
+Se debe:
 
-1. Avisar a la otra persona.
-2. Revisar juntas las dos versiones.
-3. Elegir o combinar el contenido correcto.
+1. Avisar al otro integrante.
+2. Revisar las dos versiones.
+3. Conservar o combinar el contenido correcto.
 4. Ejecutar las pruebas.
-5. Crear un nuevo commit con la solución.
-
-## Revisión rápida antes de hacer `push`
-
-Antes de enviar un cambio, confirmar:
-
-- Estoy en mi rama personal.
-- Los archivos funcionan.
-- Revisé `git status`.
-- El dataset no aparece en los cambios.
-- No hay contraseñas ni tokens.
-- El mensaje del commit explica lo que hice.
+5. Crear un commit con la solución.

@@ -5,11 +5,16 @@ La idea es analizar las condiciones de funcionamiento de una máquina y detectar
 
 ## Estado del proyecto
 
-Estamos trabajando por etapas.
+El proyecto se desarrolla por etapas mediante ramas de funcionalidad.
 
-- Etapa actual: **Etapa 1 — Repositorio Git**.
-- Completado: estructura inicial, ramas de trabajo y reglas para no subir el dataset.
-- Próximo paso: crear la ingesta reproducible de datos.
+- Completado: **Etapa 1 — Repositorio Git**.
+- Completado: **Etapa 2 — Ingesta reproducible**.
+- Próxima etapa: **Data Quality y validaciones automáticas**.
+
+El flujo Git utilizado es:
+
+```text
+feature/<tarea> → develop → main
 
 ## 1. Business Problem
 
@@ -165,11 +170,21 @@ Pendiente. Aquí se mostrarán los resultados finales y sus limitaciones.
 
 ## 13. Team
 
-| Integrante | Rama de trabajo |
-|---|---|
-| Byron | `Byron` |
-| Dayana | `Dayana` |
+## 13. Team
 
-La rama `main` se utiliza únicamente para guardar versiones revisadas y funcionales.
+| Integrante | Participación |
+|---|---|
+| Byron | Implementación de la ingesta reproducible y documentación inicial. |
+| Dayana | Verificación independiente de la ingesta y funcionalidades asignadas posteriormente. |
+
+Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.
+
+Ejemplos:
+
+```text
+feature/data-validation
+feature/model
+feature/api
+feature/monitoring
 
 Si nunca has trabajado con Git o GitHub, sigue la guía [`CONTRIBUTING.md`](CONTRIBUTING.md). Allí están los pasos y comandos básicos.
