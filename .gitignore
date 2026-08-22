@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Entornos y secretos
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Datos: se conservan únicamente marcadores y documentación
+data/raw/*
+!data/raw/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/production/*
+!data/production/.gitkeep
+
+# Artefactos de modelos y experimentos
+artifacts/
+models/
+mlruns/
+mlartifacts/
+*.pkl
+*.pickle
+*.joblib
+*.onnx
+
+# Ejecución, logs y monitoreo local
+logs/
+monitoring_output/
+*.log
+*.pid
+
+# IDE y sistema operativo
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
