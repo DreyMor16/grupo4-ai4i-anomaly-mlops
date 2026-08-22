@@ -52,3 +52,5 @@ monitoring_output/
 Thumbs.db
 desktop.ini
 
+# Reporte dinámico del Data Quality Gate
+reports/validation/data_quality_report.json
