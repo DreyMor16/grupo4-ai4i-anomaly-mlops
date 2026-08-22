@@ -1,6 +1,4 @@
-# Guía sencilla para trabajar con Git y GitHub
 
-Esta guía está pensada para alguien que nunca ha utilizado Git o GitHub.
 
 ## ¿Qué son Git y GitHub?
 
@@ -52,9 +50,7 @@ Dayana debe utilizar:
 git switch Dayana
 ```
 
-## Pasos para guardar un cambio
 
-El siguiente ejemplo utiliza la rama de Byron. Dayana debe reemplazar `Byron` por `Dayana`.
 
 ### 1. Entrar en la rama personal
 
@@ -127,8 +123,6 @@ git switch Byron
 git merge main
 git push origin Byron
 ```
-
-Dayana debe utilizar su nombre de rama en los dos últimos comandos.
 
 ## Mensajes de commit
 
