@@ -83,24 +83,61 @@ Las carpetas principales son:
 
 ## 5. Installation
 
-Todavía no hay dependencias de Python instaladas. Esta sección se completará cuando iniciemos la ingesta.
+El proyecto fue probado con Python 3.13.14.
 
-Cuando el repositorio se publique en GitHub, se podrá descargar con:
+Clonar el repositorio:
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
-cd "Proyecto Integrador"
+git clone https://github.com/DreyMor16/grupo4-ai4i-anomaly-mlops.git
+cd grupo4-ai4i-anomaly-mlops
 ```
+
+Crear y activar un entorno virtual en Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Instalar las dependencias:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+La carpeta `.venv` es local y no se sube a GitHub.
 
 ## 6. Data Ingestion
 
-Pendiente. El comando requerido será:
+La ingesta descarga el dataset AI4I 2020 directamente desde el repositorio de UCI mediante `ucimlrepo`.
 
-```bash
+Ejecutar:
+
+```powershell
 python src/ingestion/ingest.py
 ```
 
-Ese programa deberá obtener o preparar el dataset sin depender de una ruta personal.
+El script:
+
+1. Descarga el dataset de UCI con el identificador `601`.
+2. Recupera identificadores, características y objetivos.
+3. Verifica que existan 10.000 filas y 14 columnas.
+4. Comprueba que exista la columna `Machine failure`.
+5. Guarda el dataset en `data/raw/ai4i2020.csv`.
+6. Muestra la distribución de la variable objetivo.
+7. Calcula una huella SHA-256 para identificar la versión de los datos.
+
+El archivo generado no se sube a GitHub porque `data/raw/` está excluido mediante `.gitignore`.
+
+Resultado esperado:
+
+```text
+Filas: 10000
+Columnas: 14
+Distribución de Machine failure: {0: 9661, 1: 339}
+```
+
+La primera ejecución necesita conexión a internet.
 
 ## 7. Training
 
