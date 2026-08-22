@@ -1,0 +1,87 @@
+{
+  "ruta_dataset": "data/raw/ai4i2020.csv",
+  "filas_minimas": 10000,
+  "tasa_maxima_faltantes": 0.0,
+  "marcadores_faltantes": [
+    "",
+    "?",
+    "-",
+    "--",
+    "na",
+    "n/a",
+    "null",
+    "none",
+    "nan",
+    "missing",
+    "unknown"
+    ],
+  "tasa_maxima_duplicados": 0.0,
+  "tasa_maxima_inconsistencia_logica": 0.003,
+  "permitir_columnas_adicionales": false,
+  "columna_objetivo": "Machine failure",
+  "columnas_requeridas": [
+    "UID",
+    "Product ID",
+    "Type",
+    "Air temperature",
+    "Process temperature",
+    "Rotational speed",
+    "Torque",
+    "Tool wear",
+    "Machine failure",
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF"
+  ],
+  "columnas_identificadoras": [
+    "UID",
+    "Product ID"
+  ],
+  "columnas_numericas": [
+    "UID",
+    "Air temperature",
+    "Process temperature",
+    "Rotational speed",
+    "Torque",
+    "Tool wear",
+    "Machine failure",
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF"
+  ],
+  "columnas_binarias": [
+    "Machine failure",
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF"
+  ],
+  "columnas_modos_falla": [
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF"
+  ],
+  "categorias_permitidas": {
+    "Type": [
+      "H",
+      "L",
+      "M"
+    ]
+  },
+  "columnas_positivas": [
+    "Air temperature",
+    "Process temperature",
+    "Rotational speed"
+  ],
+  "columnas_no_negativas": [
+    "Torque",
+    "Tool wear"
+  ]
+}
