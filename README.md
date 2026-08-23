@@ -207,36 +207,114 @@ Códigos de salida:
 - `1`: alguna regla falla y se bloquea el entrenamiento.
 - `2`: existe un error técnico o de configuración.
 
-## 8. Training
+## 8. Exploratory data analysis (EDA)
+
+El diagnóstico exploratorio se encuentra en:
+
+```text
+notebooks/02_exploratory_data_analysis.ipynb
+```
+
+El notebook utiliza `data/raw/ai4i2020.csv`, generado por la ingesta. Se realizó un análisis del comportamiento estadístico y las relaciones entre las variables del dataset AI4I 2020 antes del preprocesamiento y modelado, con el fin de justificar las decisiones tomadas durante la etapa de ingeniería de características y el preprocesamiento.
+
+Los resultados del EDA permitieron definir las transformaciones que posteriormente se incorporaron al pipeline de preprocesamiento.
+
+## 9. Feature Engineering y Preprocesamiento
+
+A partir de las decisiones obtenidas durante el EDA, se implementó un pipeline de preprocesamiento encargado de preparar los datos antes del entrenamiento de los modelos.
+
+
+El flujo de preparación de los datos es:
+```text
+data/raw/ai4i2020.csv (datos de la ingesta)
+        ↓
+Carga automática del dataset
+        ↓
+Corrección de inconsistencias:
+RNF = 1 y Machine failure = 0
+→ Machine failure = 1
+        ↓
+Selección de Variables predictoras X
+(Type, Air temperature,Process temperature, Rotational speed, Torque y Tool wear)
+        ↓
+Separación de variable objetivo y
+(Machine failure)
+        ↓
+train_test_split (0.2 test, 0.8 train)
+con stratify=y
+        ↓
+┌─────────────────┬─────────────────┐
+│     X_train     │      X_test     │
+└────────┬────────┴────────┬────────┘
+         ↓                 ↓
+   fit_transform()     transform()
+         ↓                 ↓
+ Feature Engineering   Feature Engineering
+ RobustScaler          RobustScaler aprendido
+ OneHotEncoder         OneHotEncoder aprendido
+         ↓                 ↓
+ X_train procesado     X_test procesado
+```
+
+Las transformaciones se encuentran encapsuladas en un pipeline de scikit-learn, evitando mantener una lógica de preparación diferente entre el análisis, el entrenamiento y las etapas posteriores del proyecto.
+
+### 9.1 Uso del preprocesamiento en durante el entrenamiento
+
+El módulo de entrenamiento utiliza el preprocesador definido en:
+
+```text
+src/feature_engineering/preprocessing.py
+```
+
+Para utilizarlo desde  `train.py` se importa la función principal de preprocesamiento:
+
+```python
+from src.feature_engineering.preprocessing import preprocesar_datos
+```
+
+Posteriormente, el conjunto de datos proveniente de la etapa de ingesta se pasa a esta función:
+
+```python
+X_train, X_test, y_train, y_test, preprocessor = preprocesar_datos(datos) 
+```
+
+La función, busca los datos obtenidos de la ingesta, ejecuta automáticamente la corrección de inconsistencias en la etiqueta, la selección de variables, la división en entrenamiento y prueba, la creación de variables derivadas, el escalado de las variables numéricas y la codificación de `Type`.
+
+El objeto `preprocessor` conserva las transformaciones aprendidas con los datos de entrenamiento, por lo que puede reutilizarse posteriormente para transformar nuevos datos utilizando exactamente la misma lógica aplicada durante el entrenamiento.
+
+Una vez finalizado el preprocesamiento, `X_train` y `X_test` quedan preparados para ser utilizados por los algoritmos de detección de anomalías.
+
+
+## 10. Training
 
 Pendiente. Aquí se documentará cómo entrenar y evaluar el detector de anomalías.
 
-## 9. MLflow
+## 11. MLflow
 
 Pendiente. Aquí se explicará cómo abrir MLflow y consultar experimentos, métricas, archivos y versiones del modelo.
 
-## 10. Docker
+## 12. Docker
 
 Pendiente. Aquí se incluirán los comandos para construir y ejecutar el contenedor.
 
-## 11. API
+## 13. API
 
 Pendiente. La API deberá recibir datos de una máquina y responder si son normales o anómalos.
 
-## 12. Monitoring
+## 14. Monitoring
 
 Pendiente. Se monitorearán los datos, el modelo y el funcionamiento de la API.
 
-## 13. Results
+## 15. Results
 
 Pendiente. Aquí se mostrarán los resultados finales y sus limitaciones.
 
-## 14. Team
+## 16. Team
 
 | Integrante | Participación |
 |---|---|
 | Byron | Repositorio Git,Implementación de la ingesta reproducible, documentación inicial, Data Quality y Data Quality Gates. |
-| Dayana ||
+| Dayana | Análisis exploratorio de datos (EDA), ingeniería de características, pipeline de preprocesamiento reutilizable |
 
 Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.
 
