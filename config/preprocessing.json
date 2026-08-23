@@ -1,0 +1,52 @@
+{
+ 
+  "target": "Machine failure",
+
+  "id_columns": [
+    "UID",
+    "Product ID"
+  ],
+
+  "failure_columns": [
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF"
+  ],
+
+  "input_features": [
+    "Type",
+    "Air temperature",
+    "Process temperature",
+    "Rotational speed",
+    "Torque",
+    "Tool wear"
+  ],
+
+  "numeric_features": [
+    "Air temperature",
+    "Process temperature",
+    "Rotational speed",
+    "Torque",
+    "Tool wear",
+    "Temperature difference",
+    "Power",
+    "Torque_ToolWear_Product"
+  ],
+
+  "categorical_features": [
+    "Type"
+  ],
+
+  "derived_features": [
+    "Temperature difference",
+    "Power",
+    "Torque_ToolWear_Product"
+  ],
+
+  "preprocessing": {
+    "categorical_encoder": "OneHotEncoder",
+    "scaler": "RobustScaler"
+  }
+}
