@@ -1,182 +1,257 @@
-import json
+# preprocessing.py prepara los datos para comparar diferentes conjuntos de variables
+# en el experimento 2 sin modificar el preprocessing utilizado en el baseline.
+# Aplica la misma limpieza, feature engineering, división y transformación,
+# cambiando únicamente las variables incluidas en cada feature set.
+
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, RobustScaler
 
 
-RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
+# Ruta del dataset
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-RUTA_CONFIG = (
-    RAIZ_PROYECTO / "config" / "preprocessing.json"
+DATA_PATH = (
+    PROJECT_ROOT
+    / "data"
+    / "raw"
+    / "ai4i2020.csv"
 )
 
-RUTA_DATOS = (
-    RAIZ_PROYECTO / "data" / "raw" / "ai4i2020.csv"
-)
+
+# Conjuntos de variables que se compararán en el experimento 2
+FEATURE_SETS = {
+
+    # Variables originales
+    "base": [
+        "Type",
+        "Air temperature",
+        "Process temperature",
+        "Rotational speed",
+        "Torque",
+        "Tool wear",
+    ],
+
+    # Variables originales + variables creadas mediante feature engineering
+    "engineered": [
+        "Type",
+        "Air temperature",
+        "Process temperature",
+        "Rotational speed",
+        "Torque",
+        "Tool wear",
+        "Temperature difference",
+        "Power",
+        "Torque_ToolWear_Product",
+    ],
+
+    # Solo variables creadas mediante feature engineering.
+    # Se conserva Type porque no existe una variable derivada que la sustituya.
+    "engineered_only": [
+        "Type",
+        "Temperature difference",
+        "Power",
+        "Torque_ToolWear_Product",
+    ],
+
+    # Conjunto reducido para disminuir redundancia entre variables
+    # originales y variables derivadas.
+    "reduced": [
+        "Type",
+        "Process temperature",
+        "Temperature difference",
+        "Rotational speed",
+        "Torque",
+        "Tool wear",
+        "Torque_ToolWear_Product",
+    ],
+}
 
 
-def cargar_configuracion():
-    if not RUTA_CONFIG.exists():
-        raise FileNotFoundError(
-            f"No se encontró la configuración: {RUTA_CONFIG}"
-        )
+def crear_features(datos):
 
-    with RUTA_CONFIG.open(encoding="utf-8") as archivo:
-        return json.load(archivo)
+    # Crear una copia para no modificar el DataFrame original
+    datos = datos.copy()
 
-
-class FeatureEngineer(BaseEstimator, TransformerMixin):
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        X = X.copy()
-
-        X["Temperature difference"] = (
-            X["Process temperature"]
-            - X["Air temperature"]
-        )
-
-        angular_speed = (
-            2 * np.pi
-            * X["Rotational speed"]
-            / 60
-        )
-
-        X["Power"] = (
-            X["Torque"]
-            * angular_speed
-        )
-
-        X["Torque_ToolWear_Product"] = (
-            X["Torque"]
-            * X["Tool wear"]
-        )
-
-        return X
-
-
-def construir_preprocessor(configuracion):
-
-    pipeline_numerico = Pipeline(
-        steps=[
-            ("scaler", RobustScaler())
-        ]
+    # Diferencia entre la temperatura del proceso y la temperatura del aire
+    datos["Temperature difference"] = (
+        datos["Process temperature"]
+        - datos["Air temperature"]
     )
 
-    pipeline_categorico = Pipeline(
-        steps=[
-            (
-                "encoder",
-                OneHotEncoder(
-                    handle_unknown="ignore",
-                    sparse_output=False
-                )
-            )
-        ]
+    # Convertir la velocidad de rotación de rpm a rad/s
+    angular_speed = (
+        2
+        * np.pi
+        * datos["Rotational speed"]
+        / 60
     )
 
-    transformador = ColumnTransformer(
-        transformers=[
-            (
-                "numeric",
-                pipeline_numerico,
-                configuracion["numeric_features"]
-            ),
-            (
-                "categorical",
-                pipeline_categorico,
-                configuracion["categorical_features"]
-            )
-        ]
+    # Potencia mecánica aproximada en watts
+    datos["Power"] = (
+        datos["Torque"]
+        * angular_speed
     )
 
-    return Pipeline(
-        steps=[
-            (
-                "feature_engineering",
-                FeatureEngineer()
-            ),
-            (
-                "transformaciones",
-                transformador
-            )
-        ]
+    # Interacción entre torque y desgaste de herramienta
+    datos["Torque_ToolWear_Product"] = (
+        datos["Torque"]
+        * datos["Tool wear"]
     )
+
+    return datos
 
 
 def preprocesar_datos(
-    test_size=0.2,
+    feature_set,
     random_state=42
 ):
 
-    # 1. Cargar configuración
-    configuracion = cargar_configuracion()
-
-    # 2. Consumir el dataset generado por ingest.py
-    if not RUTA_DATOS.exists():
-        raise FileNotFoundError(
-            "No se encontró el dataset raw. "
-            "Ejecute primero src/ingestion/ingest.py"
+    # Verificar que el feature set solicitado exista
+    if feature_set not in FEATURE_SETS:
+        raise ValueError(
+            f"Feature set no válido: {feature_set}. "
+            f"Opciones disponibles: {list(FEATURE_SETS.keys())}"
         )
 
-    datos = pd.read_csv(RUTA_DATOS)
+    # Cargar los datos
+    datos = pd.read_csv(
+        DATA_PATH
+    )
 
-    # 3. Corregir inconsistencia RNF
-    mascara = (
-        (datos["RNF"] == 1)
-        & (datos["Machine failure"] == 0)
+    # Corregir los registros donde existe un modo de falla activo
+    # pero Machine failure aparece como 0.
+    columnas_falla = [
+        "TWF",
+        "HDF",
+        "PWF",
+        "OSF",
+        "RNF",
+    ]
+
+    falla_especifica = (
+        datos[columnas_falla]
+        .max(axis=1)
+    )
+
+    mascara_corregir = (
+        (datos["Machine failure"] == 0)
+        & (falla_especifica == 1)
     )
 
     datos.loc[
-        mascara,
+        mascara_corregir,
         "Machine failure"
     ] = 1
 
-    # 4. Separar X e y
+    # Crear las variables derivadas antes de seleccionar el feature set
+    datos = crear_features(
+        datos
+    )
+
+    # Seleccionar únicamente las variables correspondientes al experimento
+    features = FEATURE_SETS[
+        feature_set
+    ]
+
     X = datos[
-        configuracion["input_features"]
+        features
     ].copy()
 
+    # Machine failure se utiliza únicamente como referencia para evaluación
     y = datos[
-        configuracion["target"]
+        "Machine failure"
     ].copy()
 
-    # 5. Separar train/test
+    # ==========================================
+    # División 70 % train, 15 % validation y 15 % test
+    # ==========================================
+
     (
         X_train,
-        X_test,
+        X_temp,
         y_train,
-        y_test
+        y_temp
     ) = train_test_split(
         X,
         y,
-        test_size=test_size,
+        test_size=0.30,
         random_state=random_state,
-        stratify=y
     )
 
-    # 6. Construir preprocessing
-    preprocessor = construir_preprocessor(
-        configuracion
+    (
+        X_val,
+        X_test,
+        y_val,
+        y_test
+    ) = train_test_split(
+        X_temp,
+        y_temp,
+        test_size=0.50,
+        random_state=random_state,
+        stratify=y_temp
     )
 
-    # 7. Ajustar SOLO con train
+    # ==========================================
+    # Definir variables numéricas y categóricas
+    # ==========================================
+
+    columnas_categoricas = [
+        columna
+        for columna in ["Type"]
+        if columna in features
+    ]
+
+    columnas_numericas = [
+        columna
+        for columna in features
+        if columna not in columnas_categoricas
+    ]
+
+    # ==========================================
+    # Preprocessing
+    # RobustScaler para variables numéricas
+    # OneHotEncoder para Type
+    # ==========================================
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "numeric",
+                RobustScaler(),
+                columnas_numericas
+            ),
+            (
+                "categorical",
+                OneHotEncoder(
+                    handle_unknown="ignore",
+                    sparse_output=False
+                ),
+                columnas_categoricas
+            ),
+        ],
+        remainder="drop"
+    )
+
+    # Ajustar el preprocessing únicamente con train
     X_train_procesado = (
         preprocessor.fit_transform(
             X_train
         )
     )
 
-    # 8. Test usa lo aprendido en train
+    # Aplicar la misma transformación a validation y test
+    X_val_procesado = (
+        preprocessor.transform(
+            X_val
+        )
+    )
+
     X_test_procesado = (
         preprocessor.transform(
             X_test
@@ -185,8 +260,10 @@ def preprocesar_datos(
 
     return (
         X_train_procesado,
+        X_val_procesado,
         X_test_procesado,
         y_train,
+        y_val,
         y_test,
         preprocessor
     )
