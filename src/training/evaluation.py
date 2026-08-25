@@ -6,6 +6,11 @@
 #Precision-Recall.
 
 
+import matplotlib
+
+# Utilizar un backend no interactivo para generar los gráficos
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import (
