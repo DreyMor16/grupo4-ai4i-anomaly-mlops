@@ -11,6 +11,7 @@ import json
 import subprocess
 
 import mlflow
+import pandas as pd
 
 from pathlib import Path
 
@@ -301,6 +302,15 @@ def main():
             mejor
         )
 
+    # Convertir los resultados a tablas
+    df_resultados = pd.DataFrame(
+        resultados
+    )
+
+    df_mejores = pd.DataFrame(
+        mejores_resultados
+    )
+
     # Crear la carpeta local de resultados si no existe
     results_dir = (
         PROJECT_ROOT /
@@ -312,14 +322,14 @@ def main():
         exist_ok=True
     )
 
-    # Guardar todos los resultados del experimento
-    all_results_path = (
+    # Guardar todos los resultados en JSON
+    all_results_json = (
         results_dir /
         "experiment_2_all_results.json"
     )
 
     with open(
-        all_results_path,
+        all_results_json,
         "w",
         encoding="utf-8"
     ) as f:
@@ -330,14 +340,14 @@ def main():
             indent=4
         )
 
-    # Guardar el mejor feature set de cada algoritmo
-    best_results_path = (
+    # Guardar los mejores resultados en JSON
+    best_results_json = (
         results_dir /
         "experiment_2_best_results.json"
     )
 
     with open(
-        best_results_path,
+        best_results_json,
         "w",
         encoding="utf-8"
     ) as f:
@@ -347,6 +357,28 @@ def main():
             f,
             indent=4
         )
+
+    # Guardar todos los resultados en formato tabular
+    all_results_csv = (
+        results_dir /
+        "experiment_2_all_results.csv"
+    )
+
+    df_resultados.to_csv(
+        all_results_csv,
+        index=False
+    )
+
+    # Guardar los mejores resultados en formato tabular
+    best_results_csv = (
+        results_dir /
+        "experiment_2_best_results.csv"
+    )
+
+    df_mejores.to_csv(
+        best_results_csv,
+        index=False
+    )
 
     # Registrar un run resumen del experimento
     with mlflow.start_run(
@@ -389,16 +421,28 @@ def main():
             git_commit
         )
 
-        # Registrar todos los resultados como artefacto
+        # Registrar todos los resultados en JSON
         mlflow.log_dict(
             resultados,
             "results/all_results.json"
         )
 
-        # Registrar los mejores resultados como artefacto
+        # Registrar los mejores resultados en JSON
         mlflow.log_dict(
             mejores_resultados,
             "results/best_results.json"
+        )
+
+        # Registrar todos los resultados en formato tabular
+        mlflow.log_artifact(
+            str(all_results_csv),
+            artifact_path="results"
+        )
+
+        # Registrar los mejores resultados en formato tabular
+        mlflow.log_artifact(
+            str(best_results_csv),
+            artifact_path="results"
         )
 
     # Mostrar resumen de resultados
