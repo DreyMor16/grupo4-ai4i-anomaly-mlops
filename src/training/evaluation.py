@@ -1,9 +1,9 @@
-#evaluation.py se encarga de 
+# evaluation.py se encarga de
 
-#Centraliza la evaluación de los modelos de detección de anomalías.
-#Define las métricas utilizadas para comparar los modelos y las funciones
-#para generar la matriz de confusión, la curva ROC y la curva
-#Precision-Recall.
+# Centraliza la evaluación de los modelos de detección de anomalías.
+# Define las métricas utilizadas para comparar los modelos y las funciones
+# para generar la matriz de confusión, la curva ROC y la curva
+# Precision-Recall.
 
 
 import matplotlib
@@ -12,11 +12,13 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
     ConfusionMatrixDisplay,
+    confusion_matrix,
     f1_score,
     precision_recall_curve,
     precision_score,
@@ -27,29 +29,63 @@ from sklearn.metrics import (
 
 
 # Calcula las métricas comunes para todos los modelos
-def calcular_metricas(  # Métricas calculadas con la clasificación final 0/1
+def calcular_metricas(
     y_true,
     y_pred,
     scores
 ):
-    
+
+    # Calcular los valores de la matriz de confusión
+    tn, fp, fn, tp = confusion_matrix(
+        y_true,
+        y_pred,
+        labels=[0, 1]
+    ).ravel()
+
+    # Calcular precision
+    precision = precision_score(
+        y_true,
+        y_pred,
+        zero_division=0
+    )
+
+    # Calcular recall o exhaustividad
+    recall = recall_score(
+        y_true,
+        y_pred,
+        zero_division=0
+    )
+
+    # Calcular especificidad
+    specificity = (
+        tn / (tn + fp)
+        if (tn + fp) > 0
+        else 0
+    )
+
+    # Calcular tasa de falsos positivos
+    false_positive_rate = (
+        fp / (fp + tn)
+        if (fp + tn) > 0
+        else 0
+    )
+
+    # Calcular G-Mean
+    g_mean = np.sqrt(
+        recall * specificity
+    )
+
     return {
+
+        # Métricas calculadas con la clasificación final 0/1
         "accuracy": accuracy_score(
             y_true,
             y_pred
         ),
 
-        "precision": precision_score(
-            y_true,
-            y_pred,
-            zero_division=0
-        ),
+        "precision": precision,
 
-        "recall": recall_score(
-            y_true,
-            y_pred,
-            zero_division=0
-        ),
+        "recall": recall,
 
         "f1_score": f1_score(
             y_true,
@@ -57,7 +93,13 @@ def calcular_metricas(  # Métricas calculadas con la clasificación final 0/1
             zero_division=0
         ),
 
-        # Métricas calculadas utilizando el anomaly score:
+        "specificity": specificity,
+
+        "false_positive_rate": false_positive_rate,
+
+        "g_mean": g_mean,
+
+        # Métricas calculadas utilizando el anomaly score
         "roc_auc": roc_auc_score(
             y_true,
             scores
@@ -69,7 +111,8 @@ def calcular_metricas(  # Métricas calculadas con la clasificación final 0/1
         ),
     }
 
-# Se define la función que la matriz de confusión de las predicciones
+
+# Se define la función que genera la matriz de confusión de las predicciones
 def crear_matriz_confusion(
     y_true,
     y_pred
@@ -117,17 +160,21 @@ def crear_matriz_confusion(
 
     return fig
 
-# Se define la funcion que genera la curva ROC a partir de los anomaly scores
+
+# Se define la función que genera la curva ROC a partir de los anomaly scores
 def crear_curva_roc(
     y_true,
     scores
 ):
-    fpr, tpr, _ = roc_curve(# Calcular puntos de la curva ROC
+
+    # Calcular puntos de la curva ROC
+    fpr, tpr, _ = roc_curve(
         y_true,
         scores
     )
 
-    roc_auc = roc_auc_score( # Calcular el área bajo la curva
+    # Calcular el área bajo la curva
+    roc_auc = roc_auc_score(
         y_true,
         scores
     )
@@ -140,7 +187,8 @@ def crear_curva_roc(
         label=f"ROC-AUC = {roc_auc:.3f}"
     )
 
-    ax.plot(  # Línea de referencia correspondiente a una clasificación aleatoria
+    # Línea de referencia correspondiente a una clasificación aleatoria
+    ax.plot(
         [0, 1],
         [0, 1],
         linestyle="--"
@@ -164,17 +212,18 @@ def crear_curva_roc(
 
     return fig
 
-# Se define la función que enera la curva Precision-Recall a partir de los anomaly scores
+
+# Se define la función que genera la curva Precision-Recall
+# a partir de los anomaly scores
 def crear_curva_precision_recall(
     y_true,
     scores
 ):
+
     # Calcular precision y recall para diferentes umbrales
-    precision, recall, _ = (
-        precision_recall_curve(
-            y_true,
-            scores
-        )
+    precision, recall, _ = precision_recall_curve(
+        y_true,
+        scores
     )
 
     # Calcular el área bajo la curva Precision-Recall

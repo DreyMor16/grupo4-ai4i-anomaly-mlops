@@ -39,7 +39,11 @@ def entrenar_one_class_svm(
 ):
 
     with mlflow.start_run(
-        run_name=f"OneClassSVM_{feature_set}"
+    run_name=(
+        f"OCSVM_{feature_set}_"
+        f"nu{str(nu).replace('.', '')}_"
+        f"g{str(gamma).replace('.', '')}"
+    )
     ) as run:
 
         # Registrar parámetros del experimento

@@ -39,7 +39,12 @@ def entrenar_isolation_forest(
 ):
 
     with mlflow.start_run(
-        run_name=f"IsolationForest_{feature_set}"
+    run_name=(
+        f"IF_{feature_set}_"
+        f"ne{n_estimators}_"
+        f"ms{max_samples}_"
+        f"c{str(contamination)}"
+    )
     ) as run:
 
         # Registrar parámetros del experimento
@@ -211,6 +216,8 @@ def entrenar_isolation_forest(
 
 
 # Calcula y registra estadísticas de los anomaly scores
+# Calcula y registra estadísticas de los anomaly scores
+# que pueden utilizarse posteriormente para monitoreo
 def registrar_distribucion_scores(
     anomaly_score
 ):
@@ -220,18 +227,33 @@ def registrar_distribucion_scores(
         "max": float(np.max(anomaly_score)),
         "mean": float(np.mean(anomaly_score)),
         "median": float(np.median(anomaly_score)),
-        "std": float(np.std(anomaly_score)),
-        "p95": float(np.percentile(anomaly_score, 95)),
-        "p97": float(np.percentile(anomaly_score, 97)),
-        "p99": float(np.percentile(anomaly_score, 99))
+        "std": float(np.std(anomaly_score))
     }
 
-    mlflow.log_metric("score_mean", score_distribution["mean"])
-    mlflow.log_metric("score_median", score_distribution["median"])
-    mlflow.log_metric("score_std", score_distribution["std"])
-    mlflow.log_metric("score_p95", score_distribution["p95"])
-    mlflow.log_metric("score_p97", score_distribution["p97"])
-    mlflow.log_metric("score_p99", score_distribution["p99"])
+    mlflow.log_metric(
+        "score_min",
+        score_distribution["min"]
+    )
+
+    mlflow.log_metric(
+        "score_max",
+        score_distribution["max"]
+    )
+
+    mlflow.log_metric(
+        "score_mean",
+        score_distribution["mean"]
+    )
+
+    mlflow.log_metric(
+        "score_median",
+        score_distribution["median"]
+    )
+
+    mlflow.log_metric(
+        "score_std",
+        score_distribution["std"]
+    )
 
     return score_distribution
 

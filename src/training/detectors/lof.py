@@ -38,7 +38,11 @@ def entrenar_lof(
 ):
 
     with mlflow.start_run(
-        run_name=f"LOF_{feature_set}"
+    run_name=(
+        f"LOF_{feature_set}_"
+        f"nn{n_neighbors}_"
+        f"c{str(contamination).replace('.', '')}"
+    )
     ) as run:
 
         # Registrar parámetros del experimento
