@@ -71,11 +71,11 @@ OCSVM_GRID = {
         0.03
     ],
     "gamma": [
-        0.24,
-        0.36,
-        0.49,
-        0.61,
-        0.73
+        0.24, #scale*0.5
+        0.36, #scale * 0,75
+        "scale", # se busco el valor de scale del mejor resultado obtenido del exp 3 y se varia gamma a partir de ese valor
+        0.61, # scale* 1,25
+        0.73 # scale * 1,75
     ]
 }
 
