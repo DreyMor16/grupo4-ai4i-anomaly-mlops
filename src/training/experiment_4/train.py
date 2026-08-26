@@ -9,6 +9,7 @@ partir de los resultados del Experimento 3.
 import hashlib
 import json
 import subprocess
+import sys
 
 import mlflow
 import pandas as pd
@@ -16,20 +17,25 @@ import pandas as pd
 from itertools import product
 from pathlib import Path
 
+
+# Ruta raíz del proyecto
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
 from src.feature_engineering.preprocessing import preprocesar_datos
 
 from src.training.detectors.lof import entrenar_lof
 from src.training.detectors.one_class_svm import entrenar_one_class_svm
 
 
-# Ruta raíz del proyecto
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-
-
 # Configuración general del experimento
 EXPERIMENT_NAME = "04_hyperparameter_refinement_2"
 
 FEATURE_SET = "engineered_only"
+APPROACH = "semi_supervised"
 
 RANDOM_STATE = 42
 DATA_VERSION = "ai4i2020_v1"
@@ -38,34 +44,38 @@ DATA_VERSION = "ai4i2020_v1"
 # Refinamiento de hiperparámetros de LOF
 LOF_GRID = {
     "n_neighbors": [
+        30,
+        40,
         50,
         60,
-        70,
-        80,
-        100,
-        120
+        80
     ]
 }
 
-# Se mantiene fijo debido a que contamination no modificó
-# el PR-AUC para un mismo número de vecinos
-LOF_CONTAMINATION = 0.02
+# Se prueban varios valores de contamination para analizar
+# su efecto sobre Recall, Precision y FPR
+LOF_CONTAMINATION = [
+    0.03,
+    0.05,
+    0.06
+]
 
 
 # Refinamiento de hiperparámetros de One-Class SVM
 OCSVM_GRID = {
     "nu": [
-        0.05,
-        0.06,
-        0.07,
-        0.08,
-        0.10
+        0.01,
+        0.015,
+        0.02,
+        0.025,
+        0.03
     ],
     "gamma": [
-        0.005,
-        0.01,
-        0.02,
-        0.05
+        0.24,
+        0.36,
+        0.49,
+        0.61,
+        0.73
     ]
 }
 
@@ -164,6 +174,10 @@ def main():
         f"Feature set: {FEATURE_SET}"
     )
 
+    print(
+        f"Approach: {APPROACH}"
+    )
+
     # Ejecutar el preprocesamiento una sola vez
     (
         X_train,
@@ -175,6 +189,7 @@ def main():
         preprocessor
     ) = preprocesar_datos(
         feature_set=FEATURE_SET,
+        approach=APPROACH,
         random_state=RANDOM_STATE
     )
 
@@ -186,6 +201,7 @@ def main():
 
     # Lista donde se almacenarán todos los resultados
     resultados = []
+    numero_modelo = 1
 
     # ==============================================
     # LOF
@@ -195,10 +211,16 @@ def main():
     print("REFINAMIENTO DE LOF")
     print("==============================================")
 
-    for n_neighbors in LOF_GRID["n_neighbors"]:
+    for (
+        n_neighbors,
+        contamination
+    ) in product(
+        LOF_GRID["n_neighbors"],
+        LOF_CONTAMINATION
+    ):
 
         print(
-            f"n_neighbors={n_neighbors}"
+            f"n_neighbors={n_neighbors} | contamination={contamination}"
         )
 
         resultado = entrenar_lof(
@@ -208,8 +230,10 @@ def main():
             preprocessor=preprocessor,
             feature_set=FEATURE_SET,
             experiment_name=EXPERIMENT_NAME,
+            approach=APPROACH,
+            model_number=numero_modelo,
             n_neighbors=n_neighbors,
-            contamination=LOF_CONTAMINATION,
+            contamination=contamination,
             random_state=RANDOM_STATE,
             data_version=DATA_VERSION,
             data_hash=data_hash,
@@ -219,6 +243,8 @@ def main():
         resultados.append(
             resultado
         )
+
+        numero_modelo += 1
 
     # ==============================================
     # ONE-CLASS SVM
@@ -247,6 +273,8 @@ def main():
             preprocessor=preprocessor,
             feature_set=FEATURE_SET,
             experiment_name=EXPERIMENT_NAME,
+            approach=APPROACH,
+            model_number=numero_modelo,
             nu=nu,
             gamma=gamma,
             kernel=OCSVM_KERNEL,
@@ -259,6 +287,8 @@ def main():
         resultados.append(
             resultado
         )
+
+        numero_modelo += 1
 
     # ==============================================
     # SELECCIÓN DE MEJORES RESULTADOS
@@ -280,12 +310,12 @@ def main():
             if resultado["algorithm"] == algoritmo
         ]
 
-        # Seleccionar primero por PR-AUC y utilizar F1-score como desempate
+        # Seleccionar primero por PR-AUC y utilizar Recall como desempate
         mejor = max(
             resultados_algoritmo,
             key=lambda x: (
                 x["pr_auc"],
-                x["f1_score"]
+                x["recall"]
             )
         )
 
@@ -298,7 +328,7 @@ def main():
         resultados,
         key=lambda x: (
             x["pr_auc"],
-            x["f1_score"]
+            x["recall"]
         )
     )
 
@@ -419,6 +449,11 @@ def main():
         mlflow.log_param(
             "feature_set",
             FEATURE_SET
+        )
+
+        mlflow.log_param(
+            "approach",
+            APPROACH
         )
 
         mlflow.log_param(
