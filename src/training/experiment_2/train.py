@@ -9,22 +9,33 @@ el efecto del algoritmo y del conjunto de características.
 import hashlib
 import json
 import subprocess
+import sys
 
 import mlflow
 import pandas as pd
 
 from pathlib import Path
 
-from src.feature_engineering.preprocessing import preprocesar_datos
+
+# Ruta raíz del proyecto
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(
+        0,
+        str(PROJECT_ROOT)
+    )
+
+
+from src.feature_engineering.preprocessing import (
+    DATA_PATH,
+    preprocesar_datos
+)
 
 from src.training.detectors.ecod import entrenar_ecod
 from src.training.detectors.isolation_forest import entrenar_isolation_forest
 from src.training.detectors.lof import entrenar_lof
 from src.training.detectors.one_class_svm import entrenar_one_class_svm
-
-
-# Ruta raíz del proyecto
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 # Configuración general del experimento
@@ -35,6 +46,11 @@ FEATURE_SETS = [
     "engineered",
     "engineered_only",
     "reduced"
+]
+
+APPROACHES = [
+    "unsupervised",
+    "semi_supervised"
 ]
 
 RANDOM_STATE = 42
@@ -123,155 +139,163 @@ def main():
     print("EXPERIMENTO 2 - ALGORITMOS × FEATURE SETS")
     print("==============================================")
 
-    # Definir la ruta del dataset generado por la ingesta
-    data_path = (
-        PROJECT_ROOT /
-        "data" /
-        "raw" /
-        "ai4i2020.csv"
-    )
-
     # Obtener identificadores de los datos y del código utilizados
     data_hash = calcular_hash_archivo(
-        data_path
+        DATA_PATH
     )
 
     git_commit = obtener_git_commit()
 
-    print(
-        f"Data version: {DATA_VERSION}"
-    )
-
-    print(
-        f"Data hash: {data_hash[:12]}..."
-    )
-
-    print(
-        f"Git commit: {git_commit[:12]}"
-    )
-
     # Lista donde se almacenarán los resultados de todos los runs
     resultados = []
 
-    # Ejecutar los cuatro algoritmos para cada feature set
-    for feature_set in FEATURE_SETS:
+    numero_modelo = 1
+
+    # Ejecutar los cuatro algoritmos para cada feature set y enfoque
+    for approach in APPROACHES:
 
         print("\n==============================================")
-        print(f"FEATURE SET: {feature_set}")
+        print(f"ENFOQUE: {approach.upper()}")
         print("==============================================")
 
-        # Ejecutar el preprocesamiento para el feature set actual
-        (
-            X_train,
-            X_val,
-            X_test,
-            y_train,
-            y_val,
-            y_test,
-            preprocessor
-        ) = preprocesar_datos(
-            feature_set=feature_set,
-            random_state=RANDOM_STATE
-        )
+        for feature_set in FEATURE_SETS:
 
-        print(
-            f"Train: {X_train.shape} | "
-            f"Validation: {X_val.shape} | "
-            f"Test: {X_test.shape}"
-        )
+            print("\n==============================================")
+            print(f"FEATURE SET: {feature_set}")
+            print("==============================================")
 
-        # Entrenar ECOD
-        print(
-            "\nEntrenando ECOD..."
-        )
+            # Ejecutar el preprocesamiento para el feature set actual
+            (
+                X_train,
+                X_val,
+                X_test,
+                y_train,
+                y_val,
+                y_test,
+                preprocessor
+            ) = preprocesar_datos(
+                feature_set=feature_set,
+                approach=approach,
+                random_state=RANDOM_STATE
+            )
 
-        resultado = entrenar_ecod(
-            X_train=X_train,
-            X_val=X_val,
-            y_val=y_val,
-            preprocessor=preprocessor,
-            feature_set=feature_set,
-            contamination=ECOD_CONTAMINATION,
-            random_state=RANDOM_STATE,
-            data_version=DATA_VERSION,
-            data_hash=data_hash,
-            git_commit=git_commit
-        )
+            print(
+                f"Train: {X_train.shape} | "
+                f"Validation: {X_val.shape}"
+            )
 
-        resultados.append(
-            resultado
-        )
+            # Entrenar ECOD
+            print(
+                "\nEntrenando ECOD..."
+            )
 
-        # Entrenar Isolation Forest
-        print(
-            "Entrenando Isolation Forest..."
-        )
+            resultado = entrenar_ecod(
+                X_train=X_train,
+                X_val=X_val,
+                y_val=y_val,
+                preprocessor=preprocessor,
+                feature_set=feature_set,
+                contamination=ECOD_CONTAMINATION,
+                random_state=RANDOM_STATE,
+                data_version=DATA_VERSION,
+                data_hash=data_hash,
+                git_commit=git_commit,
+                experiment_name=EXPERIMENT_NAME,
+                approach=approach,
+                model_number=numero_modelo
+            )
 
-        resultado = entrenar_isolation_forest(
-            X_train=X_train,
-            X_val=X_val,
-            y_val=y_val,
-            preprocessor=preprocessor,
-            feature_set=feature_set,
-            n_estimators=IF_N_ESTIMATORS,
-            max_samples=IF_MAX_SAMPLES,
-            contamination=IF_CONTAMINATION,
-            random_state=RANDOM_STATE,
-            data_version=DATA_VERSION,
-            data_hash=data_hash,
-            git_commit=git_commit
-        )
+            resultados.append(
+                resultado
+            )
 
-        resultados.append(
-            resultado
-        )
+            numero_modelo += 1
 
-        # Entrenar LOF
-        print(
-            "Entrenando LOF..."
-        )
+            # Entrenar Isolation Forest
+            print(
+                "Entrenando Isolation Forest..."
+            )
 
-        resultado = entrenar_lof(
-            X_train=X_train,
-            X_val=X_val,
-            y_val=y_val,
-            preprocessor=preprocessor,
-            feature_set=feature_set,
-            n_neighbors=LOF_N_NEIGHBORS,
-            contamination=LOF_CONTAMINATION,
-            random_state=RANDOM_STATE,
-            data_version=DATA_VERSION,
-            data_hash=data_hash,
-            git_commit=git_commit
-        )
+            resultado = entrenar_isolation_forest(
+                X_train=X_train,
+                X_val=X_val,
+                y_val=y_val,
+                preprocessor=preprocessor,
+                feature_set=feature_set,
+                experiment_name=EXPERIMENT_NAME,
+                approach=approach,
+                model_number=numero_modelo,
+                n_estimators=IF_N_ESTIMATORS,
+                max_samples=IF_MAX_SAMPLES,
+                contamination=IF_CONTAMINATION,
+                random_state=RANDOM_STATE,
+                data_version=DATA_VERSION,
+                data_hash=data_hash,
+                git_commit=git_commit
+            )
 
-        resultados.append(
-            resultado
-        )
+            resultados.append(
+                resultado
+            )
 
-        # Entrenar One-Class SVM
-        print(
-            "Entrenando One-Class SVM..."
-        )
+            numero_modelo += 1
 
-        resultado = entrenar_one_class_svm(
-            X_train=X_train,
-            X_val=X_val,
-            y_val=y_val,
-            preprocessor=preprocessor,
-            feature_set=feature_set,
-            nu=OCSVM_NU,
-            gamma=OCSVM_GAMMA,
-            kernel=OCSVM_KERNEL,
-            random_state=RANDOM_STATE,
-            data_version=DATA_VERSION,
-            data_hash=data_hash,
-            git_commit=git_commit
-        )
+            # Entrenar LOF
+            print(
+                "Entrenando LOF..."
+            )
 
-        resultados.append(
-            resultado
-        )
+            resultado = entrenar_lof(
+                X_train=X_train,
+                X_val=X_val,
+                y_val=y_val,
+                preprocessor=preprocessor,
+                feature_set=feature_set,
+                experiment_name=EXPERIMENT_NAME,
+                approach=approach,
+                model_number=numero_modelo,
+                n_neighbors=LOF_N_NEIGHBORS,
+                contamination=LOF_CONTAMINATION,
+                random_state=RANDOM_STATE,
+                data_version=DATA_VERSION,
+                data_hash=data_hash,
+                git_commit=git_commit
+            )
+
+            resultados.append(
+                resultado
+            )
+
+            numero_modelo += 1
+
+            # Entrenar One-Class SVM
+            print(
+                "Entrenando One-Class SVM..."
+            )
+
+            resultado = entrenar_one_class_svm(
+                X_train=X_train,
+                X_val=X_val,
+                y_val=y_val,
+                preprocessor=preprocessor,
+                feature_set=feature_set,
+                experiment_name=EXPERIMENT_NAME,
+                approach=approach,
+                model_number=numero_modelo,
+                nu=OCSVM_NU,
+                gamma=OCSVM_GAMMA,
+                kernel=OCSVM_KERNEL,
+                random_state=RANDOM_STATE,
+                data_version=DATA_VERSION,
+                data_hash=data_hash,
+                git_commit=git_commit
+            )
+
+            resultados.append(
+                resultado
+            )
+
+            numero_modelo += 1
 
     # Seleccionar el mejor feature set de cada algoritmo según PR-AUC
     mejores_resultados = []
@@ -283,24 +307,32 @@ def main():
         "One-Class SVM"
     ]
 
-    for algoritmo in algoritmos:
+    for approach in APPROACHES:
 
-        # Obtener únicamente los resultados del algoritmo actual
-        resultados_algoritmo = [
-            resultado
-            for resultado in resultados
-            if resultado["algorithm"] == algoritmo
-        ]
+        for algoritmo in algoritmos:
 
-        # Seleccionar el feature set con mayor PR-AUC
-        mejor = max(
-            resultados_algoritmo,
-            key=lambda x: x["pr_auc"]
-        )
+            # Obtener únicamente los resultados del algoritmo actual
+            resultados_algoritmo = [
+                resultado
+                for resultado in resultados
+                if (
+                    resultado["algorithm"] == algoritmo
+                    and resultado["approach"] == approach
+                )
+            ]
 
-        mejores_resultados.append(
-            mejor
-        )
+            # Seleccionar el feature set con mayor PR-AUC
+            mejor = max(
+                resultados_algoritmo,
+                key=lambda x: (
+                    x["pr_auc"],
+                    x["recall"]
+                )
+            )
+
+            mejores_resultados.append(
+                mejor
+            )
 
     # Convertir los resultados a tablas
     df_resultados = pd.DataFrame(
@@ -397,6 +429,11 @@ def main():
         )
 
         mlflow.log_param(
+            "approaches",
+            ", ".join(APPROACHES)
+        )
+
+        mlflow.log_param(
             "total_runs",
             len(resultados)
         )
@@ -447,13 +484,14 @@ def main():
 
     # Mostrar resumen de resultados
     print("\n==============================================")
-    print("MEJOR FEATURE SET POR ALGORITMO")
+    print("MEJOR FEATURE SET POR ALGORITMO Y ENFOQUE")
     print("==============================================")
 
     for resultado in mejores_resultados:
 
         print(
-            f"\n{resultado['algorithm']}"
+            f"\n{resultado['algorithm']} - "
+            f"{resultado['approach']}"
         )
 
         print(
@@ -469,16 +507,19 @@ def main():
         )
 
         print(
+            f"Recall:     {resultado['recall']:.4f}"
+        )
+
+        print(
+            f"Precision:  {resultado['precision']:.4f}"
+        )
+
+        print(
             f"F1-score:   {resultado['f1_score']:.4f}"
         )
 
     print(
         f"\nTotal de runs de modelos: {len(resultados)}"
-    )
-
-    print(
-        "\nEl conjunto de test permanece reservado "
-        "para la evaluación final."
     )
 
 
