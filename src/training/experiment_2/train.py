@@ -17,10 +17,10 @@ from pathlib import Path
 
 from src.feature_engineering.preprocessing import preprocesar_datos
 
-from src.training.experiment_2.ecod import entrenar_ecod
-from src.training.experiment_2.isolation_forest import entrenar_isolation_forest
-from src.training.experiment_2.lof import entrenar_lof
-from src.training.experiment_2.one_class_svm import entrenar_one_class_svm
+from src.training.models.ecod import entrenar_ecod
+from src.training.models.isolation_forest import entrenar_isolation_forest
+from src.training.models.lof import entrenar_lof
+from src.training.models.one_class_svm import entrenar_one_class_svm
 
 
 # Ruta raíz del proyecto

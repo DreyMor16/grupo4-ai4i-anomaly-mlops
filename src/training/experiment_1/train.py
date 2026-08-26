@@ -15,7 +15,7 @@ import mlflow
 from pathlib import Path
 
 from src.feature_engineering.preprocessing import preprocesar_datos
-from src.training.experiment_1.ecod import entrenar_ecod
+from src.training.models.ecod import entrenar_ecod
 
 
 # Ruta raíz del proyecto
