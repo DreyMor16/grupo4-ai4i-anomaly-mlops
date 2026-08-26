@@ -3,6 +3,8 @@
 # y registra los parámetros, métricas, artefactos y modelo en MLflow.
 
 import joblib
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
@@ -29,21 +31,27 @@ def entrenar_one_class_svm(
     preprocessor,
     feature_set,
     experiment_name,
-    nu=0.03,
-    gamma="scale",
-    kernel="rbf",
-    random_state=42,
-    data_version="ai4i2020_v1",
-    data_hash=None,
-    git_commit=None
+    approach,
+    model_number,
+    nu,
+    gamma,
+    kernel,
+    random_state,
+    data_version,
+    data_hash,
+    git_commit
 ):
 
-    with mlflow.start_run(
-    run_name=(
-        f"OCSVM_{feature_set}_"
-        f"nu{str(nu).replace('.', '')}_"
-        f"g{str(gamma).replace('.', '')}"
+    run_name = (
+        f"{model_number:02d}_OCSVM_"
+        f"{approach}_"
+        f"{feature_set}_"
+        f"nu{nu}_"
+        f"g{gamma}"
     )
+
+    with mlflow.start_run(
+        run_name=run_name
     ) as run:
 
         # Registrar parámetros del experimento
@@ -54,7 +62,7 @@ def entrenar_one_class_svm(
         mlflow.log_param("kernel", kernel)
         mlflow.log_param("random_seed", random_state)
         mlflow.log_param("data_version", data_version)
-        mlflow.log_param("training_strategy", "unsupervised")
+        mlflow.log_param("approach", approach)
         mlflow.log_param("train_samples", X_train.shape[0])
         mlflow.log_param("validation_samples", X_val.shape[0])
         mlflow.log_param("n_features", X_train.shape[1])
@@ -163,7 +171,7 @@ def entrenar_one_class_svm(
             "data_version": data_version,
             "data_hash": data_hash,
             "git_commit": git_commit,
-            "training_strategy": "unsupervised",
+            "approach": approach,
             "train_samples": X_train.shape[0],
             "validation_samples": X_val.shape[0],
             "n_features": X_train.shape[1],
@@ -179,13 +187,16 @@ def entrenar_one_class_svm(
         guardar_modelo_y_preprocessor(
             modelo,
             preprocessor,
-            feature_set
+            run_name
         )
 
         # Guardar los resultados principales del run
         resultado = {
+            "model_number": model_number,
             "run_id": run.info.run_id,
+            "run_name": run_name,
             "algorithm": "One-Class SVM",
+            "approach": approach,
             "feature_set": feature_set,
             "kernel": kernel,
             "nu": nu,
@@ -222,18 +233,14 @@ def registrar_distribucion_scores(
         "max": float(np.max(anomaly_score)),
         "mean": float(np.mean(anomaly_score)),
         "median": float(np.median(anomaly_score)),
-        "std": float(np.std(anomaly_score)),
-        "p95": float(np.percentile(anomaly_score, 95)),
-        "p97": float(np.percentile(anomaly_score, 97)),
-        "p99": float(np.percentile(anomaly_score, 99))
+        "std": float(np.std(anomaly_score))
     }
 
+    mlflow.log_metric("score_min", score_distribution["min"])
+    mlflow.log_metric("score_max", score_distribution["max"])
     mlflow.log_metric("score_mean", score_distribution["mean"])
     mlflow.log_metric("score_median", score_distribution["median"])
     mlflow.log_metric("score_std", score_distribution["std"])
-    mlflow.log_metric("score_p95", score_distribution["p95"])
-    mlflow.log_metric("score_p97", score_distribution["p97"])
-    mlflow.log_metric("score_p99", score_distribution["p99"])
 
     return score_distribution
 
@@ -289,7 +296,7 @@ def registrar_graficos(
 def guardar_modelo_y_preprocessor(
     modelo,
     preprocessor,
-    feature_set
+    run_name
 ):
 
     # Crear la carpeta local de modelos si no existe
@@ -306,7 +313,7 @@ def guardar_modelo_y_preprocessor(
     # Guardar el modelo entrenado
     model_path = (
         model_dir /
-        f"one_class_svm_{feature_set}.pkl"
+        f"{run_name}.pkl"
     )
 
     joblib.dump(
@@ -322,7 +329,7 @@ def guardar_modelo_y_preprocessor(
     # Guardar el preprocesador utilizado
     preprocessor_path = (
         model_dir /
-        f"preprocessor_one_class_svm_{feature_set}.pkl"
+        f"preprocessor_{run_name}.pkl"
     )
 
     joblib.dump(

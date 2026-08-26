@@ -3,6 +3,8 @@
 # y registra los parámetros, métricas, artefactos y modelo en MLflow.
 
 import joblib
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
@@ -29,22 +31,28 @@ def entrenar_isolation_forest(
     preprocessor,
     feature_set,
     experiment_name,
-    n_estimators=200,
-    max_samples="auto",
-    contamination=0.03,
-    random_state=42,
-    data_version="ai4i2020_v1",
-    data_hash=None,
-    git_commit=None
+    approach,
+    model_number,
+    n_estimators,
+    max_samples,
+    contamination,
+    random_state,
+    data_version,
+    data_hash,
+    git_commit
 ):
 
-    with mlflow.start_run(
-    run_name=(
-        f"IF_{feature_set}_"
+    run_name = (
+        f"{model_number:02d}_IF_"
+        f"{approach}_"
+        f"{feature_set}_"
         f"ne{n_estimators}_"
         f"ms{max_samples}_"
-        f"c{str(contamination)}"
+        f"c{contamination}"
     )
+
+    with mlflow.start_run(
+        run_name=run_name
     ) as run:
 
         # Registrar parámetros del experimento
@@ -55,7 +63,7 @@ def entrenar_isolation_forest(
         mlflow.log_param("contamination", contamination)
         mlflow.log_param("random_seed", random_state)
         mlflow.log_param("data_version", data_version)
-        mlflow.log_param("training_strategy", "unsupervised")
+        mlflow.log_param("approach", approach)
         mlflow.log_param("train_samples", X_train.shape[0])
         mlflow.log_param("validation_samples", X_val.shape[0])
         mlflow.log_param("n_features", X_train.shape[1])
@@ -166,7 +174,7 @@ def entrenar_isolation_forest(
             "data_version": data_version,
             "data_hash": data_hash,
             "git_commit": git_commit,
-            "training_strategy": "unsupervised",
+            "approach": approach,
             "train_samples": X_train.shape[0],
             "validation_samples": X_val.shape[0],
             "n_features": X_train.shape[1],
@@ -182,13 +190,16 @@ def entrenar_isolation_forest(
         guardar_modelo_y_preprocessor(
             modelo,
             preprocessor,
-            feature_set
+            run_name
         )
 
         # Guardar los resultados principales del run
         resultado = {
+            "model_number": model_number,
             "run_id": run.info.run_id,
+            "run_name": run_name,
             "algorithm": "Isolation Forest",
+            "approach": approach,
             "feature_set": feature_set,
             "n_estimators": n_estimators,
             "max_samples": max_samples,
@@ -309,7 +320,7 @@ def registrar_graficos(
 def guardar_modelo_y_preprocessor(
     modelo,
     preprocessor,
-    feature_set
+    run_name
 ):
 
     # Crear la carpeta local de modelos si no existe
@@ -326,7 +337,7 @@ def guardar_modelo_y_preprocessor(
     # Guardar el modelo entrenado
     model_path = (
         model_dir /
-        f"isolation_forest_{feature_set}.pkl"
+        f"{run_name}.pkl"
     )
 
     joblib.dump(
@@ -342,7 +353,7 @@ def guardar_modelo_y_preprocessor(
     # Guardar el preprocesador utilizado
     preprocessor_path = (
         model_dir /
-        f"preprocessor_isolation_forest_{feature_set}.pkl"
+        f"preprocessor_{run_name}.pkl"
     )
 
     joblib.dump(

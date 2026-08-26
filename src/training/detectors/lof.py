@@ -3,6 +3,8 @@
 # y registra los parámetros, métricas, artefactos y modelo en MLflow.
 
 import joblib
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
@@ -29,20 +31,26 @@ def entrenar_lof(
     preprocessor,
     feature_set,
     experiment_name,
-    n_neighbors=20,
-    contamination=0.03,
-    random_state=42,
-    data_version="ai4i2020_v1",
-    data_hash=None,
-    git_commit=None
+    approach,
+    model_number,
+    n_neighbors,
+    contamination,
+    random_state,
+    data_version,
+    data_hash,
+    git_commit
 ):
 
-    with mlflow.start_run(
-    run_name=(
-        f"LOF_{feature_set}_"
+    run_name = (
+        f"{model_number:02d}_LOF_"
+        f"{approach}_"
+        f"{feature_set}_"
         f"nn{n_neighbors}_"
-        f"c{str(contamination).replace('.', '')}"
+        f"c{contamination}"
     )
+
+    with mlflow.start_run(
+        run_name=run_name
     ) as run:
 
         # Registrar parámetros del experimento
@@ -52,7 +60,7 @@ def entrenar_lof(
         mlflow.log_param("contamination", contamination)
         mlflow.log_param("random_seed", random_state)
         mlflow.log_param("data_version", data_version)
-        mlflow.log_param("training_strategy", "unsupervised")
+        mlflow.log_param("approach", approach)
         mlflow.log_param("train_samples", X_train.shape[0])
         mlflow.log_param("validation_samples", X_val.shape[0])
         mlflow.log_param("n_features", X_train.shape[1])
@@ -162,7 +170,7 @@ def entrenar_lof(
             "data_version": data_version,
             "data_hash": data_hash,
             "git_commit": git_commit,
-            "training_strategy": "unsupervised",
+            "approach": approach,
             "train_samples": X_train.shape[0],
             "validation_samples": X_val.shape[0],
             "n_features": X_train.shape[1],
@@ -178,13 +186,16 @@ def entrenar_lof(
         guardar_modelo_y_preprocessor(
             modelo,
             preprocessor,
-            feature_set
+            run_name
         )
 
         # Guardar los resultados principales del run
         resultado = {
+            "model_number": model_number,
             "run_id": run.info.run_id,
+            "run_name": run_name,
             "algorithm": "LOF",
+            "approach": approach,
             "feature_set": feature_set,
             "n_neighbors": n_neighbors,
             "contamination": contamination,
@@ -220,18 +231,14 @@ def registrar_distribucion_scores(
         "max": float(np.max(anomaly_score)),
         "mean": float(np.mean(anomaly_score)),
         "median": float(np.median(anomaly_score)),
-        "std": float(np.std(anomaly_score)),
-        "p95": float(np.percentile(anomaly_score, 95)),
-        "p97": float(np.percentile(anomaly_score, 97)),
-        "p99": float(np.percentile(anomaly_score, 99))
+        "std": float(np.std(anomaly_score))
     }
 
+    mlflow.log_metric("score_min", score_distribution["min"])
+    mlflow.log_metric("score_max", score_distribution["max"])
     mlflow.log_metric("score_mean", score_distribution["mean"])
     mlflow.log_metric("score_median", score_distribution["median"])
     mlflow.log_metric("score_std", score_distribution["std"])
-    mlflow.log_metric("score_p95", score_distribution["p95"])
-    mlflow.log_metric("score_p97", score_distribution["p97"])
-    mlflow.log_metric("score_p99", score_distribution["p99"])
 
     return score_distribution
 
@@ -287,7 +294,7 @@ def registrar_graficos(
 def guardar_modelo_y_preprocessor(
     modelo,
     preprocessor,
-    feature_set
+    run_name
 ):
 
     # Crear la carpeta local de modelos si no existe
@@ -304,7 +311,7 @@ def guardar_modelo_y_preprocessor(
     # Guardar el modelo entrenado
     model_path = (
         model_dir /
-        f"lof_{feature_set}.pkl"
+        f"{run_name}.pkl"
     )
 
     joblib.dump(
@@ -320,7 +327,7 @@ def guardar_modelo_y_preprocessor(
     # Guardar el preprocesador utilizado
     preprocessor_path = (
         model_dir /
-        f"preprocessor_lof_{feature_set}.pkl"
+        f"preprocessor_{run_name}.pkl"
     )
 
     joblib.dump(

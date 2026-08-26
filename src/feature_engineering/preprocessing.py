@@ -109,6 +109,8 @@ def crear_features(datos):
 
 def preprocesar_datos(
     feature_set,
+    approach="unsupervised",
+    data_path=None,
     random_state=42
 ):
 
@@ -119,9 +121,25 @@ def preprocesar_datos(
             f"Opciones disponibles: {list(FEATURE_SETS.keys())}"
         )
 
+    # Verificar que el enfoque solicitado exista
+    enfoques_validos = [
+        "unsupervised",
+        "semi_supervised",
+    ]
+
+    if approach not in enfoques_validos:
+        raise ValueError(
+            f"Approach no válido: {approach}. "
+            f"Opciones disponibles: {enfoques_validos}"
+        )
+
+    # Utilizar por defecto el dataset generado por la ingesta
+    if data_path is None:
+        data_path = DATA_PATH
+
     # Cargar los datos
     datos = pd.read_csv(
-        DATA_PATH
+        data_path
     )
 
     # Corregir los registros donde existe un modo de falla activo
@@ -182,6 +200,7 @@ def preprocesar_datos(
         y,
         test_size=0.30,
         random_state=random_state,
+        stratify=y
     )
 
     (
@@ -238,10 +257,37 @@ def preprocesar_datos(
         remainder="drop"
     )
 
-    # Ajustar el preprocessing únicamente con train
+    # ==========================================
+    # Seleccionar datos de entrenamiento según el enfoque
+    # ==========================================
+
+    if approach == "semi_supervised":
+
+        # En el enfoque semi-supervisado se utiliza Machine failure
+        # únicamente para identificar los registros normales de train.
+        mascara_normales = (
+            y_train == 0
+        )
+
+        X_train_modelo = X_train.loc[
+            mascara_normales
+        ].copy()
+
+        y_train_modelo = y_train.loc[
+            mascara_normales
+        ].copy()
+
+    else:
+
+        # En el enfoque no supervisado se utilizan todos los registros
+        # de train sin utilizar Machine failure para seleccionar datos.
+        X_train_modelo = X_train.copy()
+        y_train_modelo = y_train.copy()
+
+    # Ajustar el preprocessing únicamente con los datos utilizados en train
     X_train_procesado = (
         preprocessor.fit_transform(
-            X_train
+            X_train_modelo
         )
     )
 
@@ -259,10 +305,10 @@ def preprocesar_datos(
     )
 
     return (
-        X_train_procesado,
+        X_train_procesado, # variables para entrenar el modelo
         X_val_procesado,
         X_test_procesado,
-        y_train,
+        y_train_modelo,  
         y_val,
         y_test,
         preprocessor

@@ -3,6 +3,8 @@
 # y registra los parámetros, métricas, artefactos y modelo en MLflow.
 
 import joblib
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
@@ -28,20 +30,26 @@ def entrenar_ecod(
     y_val,
     preprocessor,
     feature_set,
+    contamination,
+    random_state,
+    data_version,
+    data_hash,
+    git_commit,
     experiment_name,
-    contamination=0.03,
-    random_state=42,
-    data_version="ai4i2020_v1",
-    data_hash=None,
-    git_commit=None
+    approach,
+    model_number
 ):
 
-    with mlflow.start_run(
-    run_name=(
-        f"ECOD_{feature_set}_"
-        f"c{str(contamination)}"
+    run_name = (
+        f"{model_number:02d}_ECOD_"
+        f"{approach}_"
+        f"{feature_set}_"
+        f"c{contamination}"
     )
-) as run:
+
+    with mlflow.start_run(
+        run_name=run_name
+    ) as run:
 
         # Registrar parámetros del experimento
         mlflow.log_param("algorithm", "ECOD")
@@ -49,7 +57,7 @@ def entrenar_ecod(
         mlflow.log_param("contamination", contamination)
         mlflow.log_param("random_seed", random_state)
         mlflow.log_param("data_version", data_version)
-        mlflow.log_param("training_strategy", "unsupervised")
+        mlflow.log_param("approach", approach)
         mlflow.log_param("train_samples", X_train.shape[0])
         mlflow.log_param("validation_samples", X_val.shape[0])
         mlflow.log_param("n_features", X_train.shape[1])
@@ -149,7 +157,7 @@ def entrenar_ecod(
             "data_version": data_version,
             "data_hash": data_hash,
             "git_commit": git_commit,
-            "training_strategy": "unsupervised",
+            "approach": approach,
             "train_samples": X_train.shape[0],
             "validation_samples": X_val.shape[0],
             "n_features": X_train.shape[1],
@@ -165,13 +173,16 @@ def entrenar_ecod(
         guardar_modelo_y_preprocessor(
             modelo,
             preprocessor,
-            feature_set
+            run_name
         )
 
         # Guardar los resultados principales del run
         resultado = {
+            "model_number": model_number,
             "run_id": run.info.run_id,
+            "run_name": run_name,
             "algorithm": "ECOD",
+            "approach": approach,
             "feature_set": feature_set,
             "contamination": contamination,
             "random_seed": random_state,
@@ -289,7 +300,7 @@ def registrar_graficos(
 def guardar_modelo_y_preprocessor(
     modelo,
     preprocessor,
-    feature_set
+    run_name
 ):
 
     # Crear la carpeta local de modelos si no existe
@@ -306,7 +317,7 @@ def guardar_modelo_y_preprocessor(
     # Guardar el modelo entrenado
     model_path = (
         model_dir /
-        f"ecod_{feature_set}.pkl"
+        f"{run_name}.pkl"
     )
 
     joblib.dump(
@@ -322,7 +333,7 @@ def guardar_modelo_y_preprocessor(
     # Guardar el preprocesador utilizado
     preprocessor_path = (
         model_dir /
-        f"preprocessor_ecod_{feature_set}.pkl"
+        f"preprocessor_{run_name}.pkl"
     )
 
     joblib.dump(
