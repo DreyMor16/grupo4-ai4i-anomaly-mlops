@@ -38,6 +38,7 @@ mlartifacts/
 *.pickle
 *.joblib
 *.onnx
+results/ 
 
 # Ejecución, logs y monitoreo local
 logs/
