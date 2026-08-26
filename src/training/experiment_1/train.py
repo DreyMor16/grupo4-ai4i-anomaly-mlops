@@ -5,6 +5,7 @@ Se utiliza ECOD con el feature set base y una configuración fija para establece
 un punto de referencia inicial. Se comparan los enfoques no supervisado y
 semi-supervisado utilizando la misma configuración y los mismos datos de validación.
 """
+import sys
 
 import hashlib
 import json
@@ -15,7 +16,17 @@ import pandas as pd
 
 from pathlib import Path
 
-from src.feature_engineering.preprocessing import (
+# Ruta raíz del proyecto
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(
+        0,
+        str(PROJECT_ROOT)
+    )
+
+
+    from src.feature_engineering.preprocessing import (
     DATA_PATH,
     preprocesar_datos
 )
@@ -23,11 +34,6 @@ from src.feature_engineering.preprocessing import (
 from src.training.detectors.ecod import (
     entrenar_ecod
 )
-
-
-# Ruta raíz del proyecto
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-
 
 # Configuración del experimento
 EXPERIMENT_NAME = "01_baseline_ecod"
