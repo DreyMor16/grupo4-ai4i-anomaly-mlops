@@ -93,6 +93,11 @@ def entrenar_one_class_svm(
             X_train
         )
 
+        mlflow.sklearn.log_model(
+            sk_model=modelo,
+            name="mlflow_model"
+        )
+
         # Invertir el score para que valores mayores representen mayor anomalía
         anomaly_score = -modelo.decision_function(
             X_val
