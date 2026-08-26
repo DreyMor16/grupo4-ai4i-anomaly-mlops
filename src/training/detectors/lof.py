@@ -93,7 +93,10 @@ def entrenar_lof(
         )
         mlflow.sklearn.log_model(
             sk_model=modelo,
-            name="mlflow_model"
+            name="mlflow_model",
+            skops_trusted_types=[
+        "sklearn.metrics._dist_metrics.EuclideanDistance64",
+        "sklearn.neighbors._kd_tree.KDTree" ]
         )
         
         # Invertir el score para que valores mayores representen mayor anomalía
