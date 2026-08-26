@@ -3,12 +3,14 @@ Experimento 3 - Refinamiento de hiperparámetros.
 
 Se evalúan diferentes configuraciones de ECOD, Isolation Forest, LOF y One-Class SVM
 utilizando los feature sets engineered, engineered_only y reduced. El objetivo es
-encontrar la mejor combinación de algoritmo, características e hiperparámetros.
+evaluar el efecto de los principales hiperparámetros manteniendo la comparación entre
+los enfoques unsupervised y semi_supervised.
 """
 
 import hashlib
 import json
 import subprocess
+import sys
 
 import mlflow
 import pandas as pd
@@ -16,16 +18,20 @@ import pandas as pd
 from itertools import product
 from pathlib import Path
 
+
+# Ruta raíz del proyecto
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
 from src.feature_engineering.preprocessing import preprocesar_datos
 
 from src.training.detectors.ecod import entrenar_ecod
 from src.training.detectors.isolation_forest import entrenar_isolation_forest
 from src.training.detectors.lof import entrenar_lof
 from src.training.detectors.one_class_svm import entrenar_one_class_svm
-
-
-# Ruta raíz del proyecto
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 # Configuración general del experimento
@@ -37,6 +43,11 @@ FEATURE_SETS = [
     "reduced"
 ]
 
+APPROACHES = [
+    "unsupervised",
+    "semi_supervised"
+]
+
 RANDOM_STATE = 42
 DATA_VERSION = "ai4i2020_v1"
 
@@ -46,8 +57,7 @@ ECOD_GRID = {
     "contamination": [
         0.02,
         0.03,
-        0.04,
-        0.06
+        0.05
     ]
 }
 
@@ -56,18 +66,15 @@ ECOD_GRID = {
 IF_GRID = {
     "n_estimators": [
         100,
-        200,
-        300
+        200
     ],
     "max_samples": [
-        "auto",
-        512
+        "auto"
     ],
     "contamination": [
         0.02,
         0.03,
-        0.04,
-        0.06
+        0.05
     ]
 }
 
@@ -77,14 +84,12 @@ LOF_GRID = {
     "n_neighbors": [
         10,
         20,
-        40,
-        60
+        40
     ],
     "contamination": [
         0.02,
         0.03,
-        0.04,
-        0.06
+        0.05
     ]
 }
 
@@ -94,13 +99,11 @@ OCSVM_GRID = {
     "nu": [
         0.02,
         0.03,
-        0.04,
-        0.06
+        0.05
     ],
     "gamma": [
         "scale",
-        0.01,
-        0.1
+        "auto"
     ]
 }
 
@@ -198,151 +201,176 @@ def main():
     # Lista donde se almacenarán los resultados de todos los runs
     resultados = []
 
-    # Ejecutar los algoritmos para cada feature set
-    for feature_set in FEATURE_SETS:
+    numero_modelo = 1
+
+    # Ejecutar los algoritmos para cada enfoque y feature set
+    for approach in APPROACHES:
 
         print("\n==============================================")
-        print(f"FEATURE SET: {feature_set}")
+        print(f"APPROACH: {approach}")
         print("==============================================")
 
-        # Ejecutar el preprocesamiento para el feature set actual
-        (
-            X_train,
-            X_val,
-            X_test,
-            y_train,
-            y_val,
-            y_test,
-            preprocessor
-        ) = preprocesar_datos(
-            feature_set=feature_set,
-            random_state=RANDOM_STATE
-        )
+        for feature_set in FEATURE_SETS:
 
-        print(
-            f"Train: {X_train.shape} | "
-            f"Validation: {X_val.shape} | "
-            f"Test: {X_test.shape}"
-        )
+            print("\n==============================================")
+            print(f"FEATURE SET: {feature_set}")
+            print("==============================================")
 
-        # Probar configuraciones de ECOD
-        print("\nEjecutando configuraciones de ECOD...")
-
-        for contamination in ECOD_GRID["contamination"]:
-
-            resultado = entrenar_ecod(
-                X_train=X_train,
-                X_val=X_val,
-                y_val=y_val,
-                preprocessor=preprocessor,
+            # Ejecutar el preprocesamiento para el feature set actual
+            (
+                X_train,
+                X_val,
+                X_test,
+                y_train,
+                y_val,
+                y_test,
+                preprocessor
+            ) = preprocesar_datos(
                 feature_set=feature_set,
-                contamination=contamination,
-                experiment_name=EXPERIMENT_NAME,
-                random_state=RANDOM_STATE,
-                data_version=DATA_VERSION,
-                data_hash=data_hash,
-                git_commit=git_commit
+                approach=approach,
+                random_state=RANDOM_STATE
             )
 
-            resultados.append(
-                resultado
+            print(
+                f"Train: {X_train.shape} | "
+                f"Validation: {X_val.shape} | "
+                f"Test: {X_test.shape}"
             )
 
-        # Probar configuraciones de Isolation Forest
-        print("\nEjecutando configuraciones de Isolation Forest...")
+            # Probar configuraciones de ECOD
+            print("\nEjecutando configuraciones de ECOD...")
 
-        for (
-            n_estimators,
-            max_samples,
-            contamination
-        ) in product(
-            IF_GRID["n_estimators"],
-            IF_GRID["max_samples"],
-            IF_GRID["contamination"]
-        ):
+            for contamination in ECOD_GRID["contamination"]:
 
-            resultado = entrenar_isolation_forest(
-                X_train=X_train,
-                X_val=X_val,
-                y_val=y_val,
-                preprocessor=preprocessor,
-                feature_set=feature_set,
-                n_estimators=n_estimators,
-                max_samples=max_samples,
-                contamination=contamination,
-                experiment_name=EXPERIMENT_NAME,
-                random_state=RANDOM_STATE,
-                data_version=DATA_VERSION,
-                data_hash=data_hash,
-                git_commit=git_commit
-            )
+                resultado = entrenar_ecod(
+                    X_train=X_train,
+                    X_val=X_val,
+                    y_val=y_val,
+                    preprocessor=preprocessor,
+                    feature_set=feature_set,
+                    contamination=contamination,
+                    random_state=RANDOM_STATE,
+                    data_version=DATA_VERSION,
+                    data_hash=data_hash,
+                    git_commit=git_commit,
+                    experiment_name=EXPERIMENT_NAME,
+                    approach=approach,
+                    model_number=numero_modelo
+                )
 
-            resultados.append(
-                resultado
-            )
+                resultados.append(
+                    resultado
+                )
 
-        # Probar configuraciones de LOF
-        print("\nEjecutando configuraciones de LOF...")
+                numero_modelo += 1
 
-        for (
-            n_neighbors,
-            contamination
-        ) in product(
-            LOF_GRID["n_neighbors"],
-            LOF_GRID["contamination"]
-        ):
+            # Probar configuraciones de Isolation Forest
+            print("\nEjecutando configuraciones de Isolation Forest...")
 
-            resultado = entrenar_lof(
-                X_train=X_train,
-                X_val=X_val,
-                y_val=y_val,
-                preprocessor=preprocessor,
-                feature_set=feature_set,
-                n_neighbors=n_neighbors,
-                contamination=contamination,
-                experiment_name=EXPERIMENT_NAME,
-                random_state=RANDOM_STATE,
-                data_version=DATA_VERSION,
-                data_hash=data_hash,
-                git_commit=git_commit
-            )
+            for (
+                n_estimators,
+                max_samples,
+                contamination
+            ) in product(
+                IF_GRID["n_estimators"],
+                IF_GRID["max_samples"],
+                IF_GRID["contamination"]
+            ):
 
-            resultados.append(
-                resultado
-            )
+                resultado = entrenar_isolation_forest(
+                    X_train=X_train,
+                    X_val=X_val,
+                    y_val=y_val,
+                    preprocessor=preprocessor,
+                    feature_set=feature_set,
+                    experiment_name=EXPERIMENT_NAME,
+                    approach=approach,
+                    model_number=numero_modelo,
+                    n_estimators=n_estimators,
+                    max_samples=max_samples,
+                    contamination=contamination,
+                    random_state=RANDOM_STATE,
+                    data_version=DATA_VERSION,
+                    data_hash=data_hash,
+                    git_commit=git_commit
+                )
 
-        # Probar configuraciones de One-Class SVM
-        print("\nEjecutando configuraciones de One-Class SVM...")
+                resultados.append(
+                    resultado
+                )
 
-        for (
-            nu,
-            gamma
-        ) in product(
-            OCSVM_GRID["nu"],
-            OCSVM_GRID["gamma"]
-        ):
+                numero_modelo += 1
 
-            resultado = entrenar_one_class_svm(
-                X_train=X_train,
-                X_val=X_val,
-                y_val=y_val,
-                preprocessor=preprocessor,
-                feature_set=feature_set,
-                experiment_name=EXPERIMENT_NAME,
-                nu=nu,
-                gamma=gamma,
-                kernel=OCSVM_KERNEL,
-                random_state=RANDOM_STATE,
-                data_version=DATA_VERSION,
-                data_hash=data_hash,
-                git_commit=git_commit
-            )
+            # Probar configuraciones de LOF
+            print("\nEjecutando configuraciones de LOF...")
 
-            resultados.append(
-                resultado
-            )
+            for (
+                n_neighbors,
+                contamination
+            ) in product(
+                LOF_GRID["n_neighbors"],
+                LOF_GRID["contamination"]
+            ):
 
-    # Seleccionar el mejor resultado de cada algoritmo
+                resultado = entrenar_lof(
+                    X_train=X_train,
+                    X_val=X_val,
+                    y_val=y_val,
+                    preprocessor=preprocessor,
+                    feature_set=feature_set,
+                    experiment_name=EXPERIMENT_NAME,
+                    approach=approach,
+                    model_number=numero_modelo,
+                    n_neighbors=n_neighbors,
+                    contamination=contamination,
+                    random_state=RANDOM_STATE,
+                    data_version=DATA_VERSION,
+                    data_hash=data_hash,
+                    git_commit=git_commit
+                )
+
+                resultados.append(
+                    resultado
+                )
+
+                numero_modelo += 1
+
+            # Probar configuraciones de One-Class SVM
+            print("\nEjecutando configuraciones de One-Class SVM...")
+
+            for (
+                nu,
+                gamma
+            ) in product(
+                OCSVM_GRID["nu"],
+                OCSVM_GRID["gamma"]
+            ):
+
+                resultado = entrenar_one_class_svm(
+                    X_train=X_train,
+                    X_val=X_val,
+                    y_val=y_val,
+                    preprocessor=preprocessor,
+                    feature_set=feature_set,
+                    experiment_name=EXPERIMENT_NAME,
+                    approach=approach,
+                    model_number=numero_modelo,
+                    nu=nu,
+                    gamma=gamma,
+                    kernel=OCSVM_KERNEL,
+                    random_state=RANDOM_STATE,
+                    data_version=DATA_VERSION,
+                    data_hash=data_hash,
+                    git_commit=git_commit
+                )
+
+                resultados.append(
+                    resultado
+                )
+
+                numero_modelo += 1
+
+    # Seleccionar el mejor resultado de cada algoritmo y enfoque
     mejores_resultados = []
 
     algoritmos = [
@@ -352,34 +380,37 @@ def main():
         "One-Class SVM"
     ]
 
-    for algoritmo in algoritmos:
+    for approach in APPROACHES:
 
-        # Obtener únicamente los resultados del algoritmo actual
-        resultados_algoritmo = [
-            resultado
-            for resultado in resultados
-            if resultado["algorithm"] == algoritmo
-        ]
+        for algoritmo in algoritmos:
 
-        # Seleccionar primero por PR-AUC y utilizar F1-score como desempate
-        mejor = max(
-            resultados_algoritmo,
-            key=lambda x: (
-                x["pr_auc"],
-                x["f1_score"]
+            # Obtener únicamente los resultados del algoritmo y enfoque actuales
+            resultados_algoritmo = [
+                resultado
+                for resultado in resultados
+                if resultado["algorithm"] == algoritmo
+                and resultado["approach"] == approach
+            ]
+
+            # Seleccionar primero por PR-AUC y utilizar Recall como desempate
+            mejor = max(
+                resultados_algoritmo,
+                key=lambda x: (
+                    x["pr_auc"],
+                    x["recall"]
+                )
             )
-        )
 
-        mejores_resultados.append(
-            mejor
-        )
+            mejores_resultados.append(
+                mejor
+            )
 
     # Seleccionar el mejor resultado global
     mejor_global = max(
         resultados,
         key=lambda x: (
             x["pr_auc"],
-            x["f1_score"]
+            x["recall"]
         )
     )
 
@@ -491,6 +522,11 @@ def main():
         )
 
         mlflow.log_param(
+            "approaches",
+            ", ".join(APPROACHES)
+        )
+
+        mlflow.log_param(
             "feature_sets",
             ", ".join(FEATURE_SETS)
         )
@@ -526,7 +562,7 @@ def main():
             "results/all_results.json"
         )
 
-        # Registrar los mejores resultados por algoritmo
+        # Registrar los mejores resultados por algoritmo y enfoque
         mlflow.log_dict(
             mejores_resultados,
             "results/best_results.json"
@@ -551,13 +587,13 @@ def main():
 
     # Mostrar resumen de resultados
     print("\n==============================================")
-    print("MEJOR CONFIGURACIÓN POR ALGORITMO")
+    print("MEJOR CONFIGURACIÓN POR ALGORITMO Y ENFOQUE")
     print("==============================================")
 
     for resultado in mejores_resultados:
 
         print(
-            f"\n{resultado['algorithm']}"
+            f"\n{resultado['algorithm']} - {resultado['approach']}"
         )
 
         print(
@@ -573,7 +609,7 @@ def main():
         )
 
         print(
-            f"F1-score:   {resultado['f1_score']:.4f}"
+            f"Recall:     {resultado['recall']:.4f}"
         )
 
     # Mostrar mejor resultado global
@@ -583,6 +619,10 @@ def main():
 
     print(
         f"Algoritmo:   {mejor_global['algorithm']}"
+    )
+
+    print(
+        f"Enfoque:     {mejor_global['approach']}"
     )
 
     print(
@@ -598,7 +638,7 @@ def main():
     )
 
     print(
-        f"F1-score:    {mejor_global['f1_score']:.4f}"
+        f"Recall:      {mejor_global['recall']:.4f}"
     )
 
     print(
