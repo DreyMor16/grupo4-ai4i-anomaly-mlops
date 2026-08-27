@@ -5,8 +5,6 @@ import mlflow
 import numpy as np
 import pandas as pd
 
-from src.feature_engineering.preprocessing import preparar_nuevos_datos
-
 
 # Calcula parámetros de normalización Min-Max
 def calcular_minmax(
@@ -115,6 +113,8 @@ def combinar_scores_minimo(
 
 
 
+
+
 # Modelo operativo del ensemble seleccionado
 class EnsembleOperationalModel(
     mlflow.pyfunc.PythonModel
@@ -122,33 +122,26 @@ class EnsembleOperationalModel(
 
     def __init__(
         self,
-        normalization,
         normalization_config,
         lof_weight,
         ocsvm_weight,
         threshold
     ):
 
-        self.normalization = normalization
         self.normalization_config = normalization_config
         self.lof_weight = lof_weight
         self.ocsvm_weight = ocsvm_weight
         self.threshold = threshold
 
-        self.preprocessor = None
         self.lof_model = None
         self.ocsvm_model = None
 
 
-    # Cargar los componentes del modelo
+    # Cargar los modelos entrenados
     def load_context(
         self,
         context
     ):
-
-        self.preprocessor = joblib.load(
-            context.artifacts["preprocessor"]
-        )
 
         self.lof_model = joblib.load(
             context.artifacts["lof_model"]
@@ -163,14 +156,12 @@ class EnsembleOperationalModel(
     def predict(
         self,
         context,
-        model_input: pd.DataFrame,
+        model_input,
         params=None
-    ) -> pd.DataFrame:
+    ):
 
-        X = preparar_nuevos_datos(
-            datos=model_input,
-            feature_set="engineered_only",
-            preprocessor=self.preprocessor
+        X = np.asarray(
+            model_input
         )
 
         lof_score = -self.lof_model.decision_function(
@@ -181,24 +172,15 @@ class EnsembleOperationalModel(
             X
         )
 
-        if self.normalization == "minmax":
+        lof_score = normalizar_minmax(
+            lof_score,
+            self.normalization_config["lof"]
+        )
 
-            lof_score = normalizar_minmax(
-                lof_score,
-                self.normalization_config["lof"]
-            )
-
-            ocsvm_score = normalizar_minmax(
-                ocsvm_score,
-                self.normalization_config["ocsvm"]
-            )
-
-        else:
-
-            raise ValueError(
-                "El modelo operativo final requiere "
-                "normalización Min-Max."
-            )
+        ocsvm_score = normalizar_minmax(
+            ocsvm_score,
+            self.normalization_config["ocsvm"]
+        )
 
         ensemble_score = combinar_scores_ponderado(
             lof_scores=lof_score,

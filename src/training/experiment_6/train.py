@@ -1999,15 +1999,11 @@ def main():
         y_train,
         y_val,
         y_test,
-        preprocessor,
-        X_train_input,
-        X_val_input,
-        X_test_input
+        preprocessor
     ) = preprocesar_datos(
         feature_set=FEATURE_SET,
         approach=APPROACH,
-        random_state=RANDOM_STATE,
-        return_input_data=True
+        random_state=RANDOM_STATE
     )
 
     feature_names = (
@@ -2040,11 +2036,6 @@ def main():
         exist_ok=True
     )
 
-    final_preprocessor_path = (
-        final_artifacts_dir /
-        "preprocessor.pkl"
-    )
-
     final_lof_path = (
         final_artifacts_dir /
         "lof_model.pkl"
@@ -2053,11 +2044,6 @@ def main():
     final_ocsvm_path = (
         final_artifacts_dir /
         "ocsvm_model.pkl"
-    )
-
-    joblib.dump(
-        preprocessor,
-        final_preprocessor_path
     )
 
     joblib.dump(
@@ -2499,7 +2485,6 @@ def main():
             }
 
             modelo_operativo = EnsembleOperationalModel(
-                normalization="minmax",
                 normalization_config=normalization_config,
                 lof_weight=float(
                     resumen["lof_weight"]
@@ -2521,9 +2506,6 @@ def main():
                 name="mlflow_model",
                 python_model=modelo_operativo,
                 artifacts={
-                    "preprocessor": str(
-                        final_preprocessor_path
-                    ),
                     "lof_model": str(
                         final_lof_path
                     ),
@@ -2531,9 +2513,7 @@ def main():
                         final_ocsvm_path
                     )
                 },
-                input_example=X_val_input.head(
-                    5
-                ).copy()
+                input_example=X_val[:5]
             )
 
     print("\n==============================================")

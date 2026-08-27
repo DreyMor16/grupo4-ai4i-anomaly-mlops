@@ -24,6 +24,17 @@ DATA_PATH = (
 )
 
 
+# Variables originales necesarias para preparar nuevos datos
+INPUT_FEATURES = [
+    "Type",
+    "Air temperature",
+    "Process temperature",
+    "Rotational speed",
+    "Torque",
+    "Tool wear",
+]
+
+
 # Conjuntos de variables que se compararán en el experimento 2
 FEATURE_SETS = {
 
@@ -107,11 +118,48 @@ def crear_features(datos):
     return datos
 
 
+# Prepara nuevos datos utilizando el mismo feature engineering y preprocessing
+def preparar_nuevos_datos(
+    datos,
+    feature_set,
+    preprocessor
+):
+
+    # Verificar que el feature set solicitado exista
+    if feature_set not in FEATURE_SETS:
+        raise ValueError(
+            f"Feature set no válido: {feature_set}. "
+            f"Opciones disponibles: {list(FEATURE_SETS.keys())}"
+        )
+
+    # Crear las mismas variables derivadas utilizadas durante entrenamiento
+    datos = crear_features(
+        datos
+    )
+
+    # Seleccionar las variables correspondientes al feature set
+    features = FEATURE_SETS[
+        feature_set
+    ]
+
+    X = datos[
+        features
+    ].copy()
+
+    # Aplicar el preprocessor ajustado durante entrenamiento
+    X_procesado = preprocessor.transform(
+        X
+    )
+
+    return X_procesado
+
+
 def preprocesar_datos(
     feature_set,
     approach="unsupervised",
     data_path=None,
-    random_state=42
+    random_state=42,
+    return_input_data=False
 ):
 
     # Verificar que el feature set solicitado exista
@@ -304,11 +352,43 @@ def preprocesar_datos(
         )
     )
 
+    # Devolver también las variables originales cuando se necesiten
+    # como entrada de un modelo operativo.
+    if return_input_data:
+
+        X_train_input = datos.loc[
+            X_train_modelo.index,
+            INPUT_FEATURES
+        ].copy()
+
+        X_val_input = datos.loc[
+            X_val.index,
+            INPUT_FEATURES
+        ].copy()
+
+        X_test_input = datos.loc[
+            X_test.index,
+            INPUT_FEATURES
+        ].copy()
+
+        return (
+            X_train_procesado, # variables para entrenar el modelo
+            X_val_procesado,
+            X_test_procesado,
+            y_train_modelo,
+            y_val,
+            y_test,
+            preprocessor,
+            X_train_input,
+            X_val_input,
+            X_test_input
+        )
+
     return (
         X_train_procesado, # variables para entrenar el modelo
         X_val_procesado,
         X_test_procesado,
-        y_train_modelo,  
+        y_train_modelo,
         y_val,
         y_test,
         preprocessor

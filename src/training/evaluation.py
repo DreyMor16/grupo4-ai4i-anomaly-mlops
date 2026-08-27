@@ -17,8 +17,8 @@ import numpy as np
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
-    ConfusionMatrixDisplay,
     confusion_matrix,
+    ConfusionMatrixDisplay,
     f1_score,
     precision_recall_curve,
     precision_score,
@@ -26,7 +26,6 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-
 
 # Calcula las métricas comunes para todos los modelos
 def calcular_metricas(

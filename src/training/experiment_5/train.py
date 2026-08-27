@@ -36,10 +36,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-from src.feature_engineering.preprocessing import (
-    preparar_nuevos_datos,
-    preprocesar_datos
-)
+from src.feature_engineering.preprocessing import preprocesar_datos
 from src.training.evaluation import (
     calcular_metricas,
     crear_curva_precision_recall,
@@ -64,10 +61,9 @@ class AnomalyThresholdModel(
 
         self.threshold = threshold
         self.model = None
-        self.preprocessor = None
 
 
-    # Cargar el modelo y el preprocesador
+    # Cargar el modelo entrenado
     def load_context(
         self,
         context
@@ -75,10 +71,6 @@ class AnomalyThresholdModel(
 
         self.model = joblib.load(
             context.artifacts["model"]
-        )
-
-        self.preprocessor = joblib.load(
-            context.artifacts["preprocessor"]
         )
 
 
@@ -90,10 +82,8 @@ class AnomalyThresholdModel(
         params=None
     ):
 
-        X = preparar_nuevos_datos(
-            datos=model_input,
-            feature_set=FEATURE_SET,
-            preprocessor=self.preprocessor
+        X = np.asarray(
+            model_input
         )
 
         anomaly_score = -self.model.decision_function(
@@ -505,15 +495,11 @@ def main():
         y_train,
         y_val,
         y_test,
-        preprocessor,
-        X_train_input,
-        X_val_input,
-        X_test_input
+        preprocessor
     ) = preprocesar_datos(
         feature_set=FEATURE_SET,
         approach=APPROACH,
-        random_state=RANDOM_STATE,
-        return_input_data=True
+        random_state=RANDOM_STATE
     )
 
     print(
@@ -806,12 +792,9 @@ def main():
                 name="mlflow_model",
                 python_model=modelo_operativo,
                 artifacts={
-                    "model": str(model_path),
-                    "preprocessor": str(preprocessor_path)
+                    "model": str(model_path)
                 },
-                input_example=X_val_input.head(
-                    5
-                ).copy()
+                input_example=X_val[:5]
             )
 
             mlflow.log_dict(
