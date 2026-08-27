@@ -284,7 +284,7 @@ En el enfoque `semi_supervised`, `Machine failure` se utiliza únicamente para s
 El feature engineering se realiza antes de seleccionar el conjunto de variables. El `RobustScaler` y el `OneHotEncoder` se ajustan únicamente con los datos utilizados para entrenamiento y posteriormente se aplican sin reajuste a validation y test.
 
 
-### 8.2 Uso del preprocesamiento en durante el entrenamiento
+### 8.2 Uso del preprocesamiento durante el entrenamiento
 
 El módulo de entrenamiento utiliza el preprocesador definido en:
 
@@ -397,7 +397,7 @@ Se trabajaron dos enfoques (approach):
 
 - semi_supervised: utiliza Machine failure únicamente para seleccionar las observaciones normales de train. La etiqueta no se utiliza como variable predictora. Validation y test conservan tanto casos normales como fallas.
 
-** Feature sets**
+**Feature sets**
 Se evaluaron cuatro conjuntos de variables:
 
 | Feature set | Descripción |
@@ -409,7 +409,7 @@ Se evaluaron cuatro conjuntos de variables:
 
 Después del One-Hot Encoding de Type, este conjunto genera 6 variables procesadas.
 
- **Experimentos**
+**Experimentos**
 | Experimento | Objetivo |
 |---|---|
 | Experiment 1 | Prueba inicial con ECOD y comparación de enfoques |
@@ -436,11 +436,12 @@ El detalle de la configuración, ejecución y resultados de cada experimento se 
 Por ejemplo:
 
 ```text
-src/training/experiment_1/README.md
-src/training/experiment_2/README.md
+src/training/experiment_1/readme.md
+src/training/experiment_2/readme.md
 ...
-src/training/experiment_6/README.md
+src/training/experiment_6/readme.md
 
+```
 
 **Métricas comunes**
 
@@ -528,7 +529,7 @@ La mejor configuración fue Weighted Average con normalización Min-Max y pesos 
 | One-Class SVM                |     0.4861 |     0.7037 |     0.2197 |     0.0934 |     
 | Ensemble LOF + One-Class SVM | **0.5342** |     0.7037 | **0.3248** | **0.0546** | 
 
-Los candidatos fueron registrados en Registry Model y posteriormente utilizados para la evaluación final.
+Los candidatos fueron registrados en Model Registry y posteriormente utilizados para la evaluación final.
 
 
 ## 10. MLflow
@@ -541,13 +542,13 @@ MLflow se utiliza para registrar los experimentos, parámetros, métricas, artef
 | **Metrics** | Accuracy, Precision, Recall, F1, Specificity, FPR, G-Mean, ROC-AUC, PR-AUC, cantidad y proporción de anomalías predichas |
 | **Artifacts** | modelos, preprocessor, configuración, matrices de confusión, curvas ROC, curvas Precision-Recall, distribución de anomaly scores, resultados CSV y JSON |
 
-Los experimentos se en registran  en MLflow con los siguientes nombres: 
+Los experimentos se registran en MLflow con los siguientes nombres: 
 
 | Experimento | Nombre | Nombre en MLflow |
 |---|---|---|
 | Experimento 1 | Baseline ECOD | `01_baseline_ecod` |
 | Experimento 2 | Comparación de algoritmos, feature sets y enfoques | `02_algorithm_feature_set_comparison` |
-| Experimento 3 | Primer ajuste de hiperparámetros | `03_hyperparameter_tuning` |
+| Experimento 3 | Primer ajuste de hiperparámetros | `03_hyperparameter_refinement` |
 | Experimento 4 | Refinamiento de hiperparámetros | `04_hyperparameter_refinement_2` |
 | Experimento 5 | Ajuste de threshold | `05_threshold_tuning` |
 | Experimento 6 | Ensemble LOF + One-Class SVM | `06_ensemble` |
@@ -592,6 +593,7 @@ Selección documentada del modelo final
       ↓
 Alias production
 
+```
 
 Los candidatos son:
 
@@ -704,7 +706,8 @@ threshold = -0.0956274078
 La evaluación final de los modelos candidatos se documenta en la sección de Model Registry en el archivo README que se encuentra en la siguiente ruta:
 
 ```text
-src/training/model_registry/README.md
+src/training/model_registry/readme.md
+```
 ...
 
 
@@ -766,14 +769,25 @@ Pendiente. Se monitorearán los datos, el modelo y el funcionamiento de la API.
 
 ## 14. Results
 
-Pendiente. Aquí se mostrarán los resultados finales y sus limitaciones.
+El modelo seleccionado para producción fue **LOF**, utilizando el conjunto de características `engineered_only` y el enfoque `semi_supervised`.
 
+| Etapa | PR-AUC | Recall | Precision | FPR |
+|---|---:|---:|---:|---:|
+| Validation | 0.5080 | 0.7222 | 0.2889 | 0.0664 |
+| Test | 0.4921 | 0.6792 | 0.2535 | 0.0733 |
+
+El modelo quedó registrado en MLflow Model Registry como:
+
+```text
+ai4i_lof_threshold_tuned
+
+```
 ## 15. Team
 
 | Integrante | Participación |
 |---|---|
-| Byron | Repositorio Git,Implementación de la ingesta reproducible, documentación inicial, Data Quality y Data Quality Gates. |
-| Análisis exploratorio de datos (EDA), ingeniería de características, desarrollo de un pipeline de preprocesamiento reutilizable, diseño y ejecución de los experimentos de comparación de modelos, ajuste de hiperparámetros y thresholds, registro y seguimiento de ejecuciones en MLflow, gestión de modelos en Model Registry, validación final sobre el conjunto de test y documentación de los resultados obtenidos. |
+| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración de cambios, verificación del pipeline y ejecución reproducible de los experimentos en MLflow. |
+| Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, ajuste de hiperparámetros y thresholds, automatización del Model Registry y documentación de los experimentos. |
 
 Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.
 
@@ -784,5 +798,5 @@ feature/data-validation
 feature/model
 feature/api
 feature/monitoring
-
+```
 Si nunca has trabajado con Git o GitHub, sigue la guía [`CONTRIBUTING.md`](CONTRIBUTING.md). Allí están los pasos y comandos básicos.
