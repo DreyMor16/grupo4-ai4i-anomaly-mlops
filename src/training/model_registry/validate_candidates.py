@@ -52,6 +52,10 @@ APPROACH = "semi_supervised"
 RANDOM_STATE = 42
 DATA_VERSION = "ai4i2020_v1"
 
+RECALL_MINIMO = 0.70
+
+
+
 
 # Obtener automáticamente los modelos con alias candidate
 def obtener_candidatos():
@@ -82,7 +86,6 @@ def obtener_candidatos():
         )
 
     return candidatos
-
 
 # Calcular hash SHA-256 del dataset utilizado
 def calcular_hash_archivo(
@@ -428,6 +431,39 @@ def evaluar_candidato(
     return resultado
 
 
+# Selecciona el mejor candidato con criterios explícitos
+def seleccionar_mejor_candidato(
+    resultados
+):
+
+    candidatos_validos = [
+        resultado
+        for resultado in resultados
+        if resultado["recall"] >= RECALL_MINIMO
+    ]
+
+    if candidatos_validos:
+
+        return max(
+            candidatos_validos,
+            key=lambda x: (
+                x["pr_auc"],
+                x["precision"],
+                -x["false_positive_rate"]
+            )
+        )
+
+    return max(
+        resultados,
+        key=lambda x: (
+            x["pr_auc"],
+            x["recall"],
+            x["precision"],
+            -x["false_positive_rate"]
+        )
+    )
+
+
 def main():
 
     # Configurar MLflow
@@ -534,11 +570,59 @@ def main():
         comparison_json,
         "w",
         encoding="utf-8"
-    ) as archivo:
+    ) as f:
 
         json.dump(
             resultados,
-            archivo,
+            f,
+            indent=4
+        )
+
+    mejor_resultado = seleccionar_mejor_candidato(
+        resultados
+    )
+
+    resumen = {
+        "selection_criteria": (
+            "Recall >= 0.70; among valid candidates, "
+            "highest PR-AUC, then Precision, then lower FPR."
+        ),
+        "best_candidate": mejor_resultado["candidate"],
+        "registered_model": mejor_resultado["registered_model"],
+        "model_uri": mejor_resultado["model_uri"],
+        "accuracy": mejor_resultado["accuracy"],
+        "precision": mejor_resultado["precision"],
+        "recall": mejor_resultado["recall"],
+        "f1_score": mejor_resultado["f1_score"],
+        "specificity": mejor_resultado["specificity"],
+        "false_positive_rate": mejor_resultado[
+            "false_positive_rate"
+        ],
+        "g_mean": mejor_resultado["g_mean"],
+        "roc_auc": mejor_resultado["roc_auc"],
+        "pr_auc": mejor_resultado["pr_auc"],
+        "predicted_anomalies": mejor_resultado[
+            "predicted_anomalies"
+        ],
+        "predicted_anomaly_rate": mejor_resultado[
+            "predicted_anomaly_rate"
+        ]
+    }
+
+    summary_json = (
+        results_dir /
+        "validation_summary.json"
+    )
+
+    with open(
+        summary_json,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            resumen,
+            f,
             indent=4
         )
 
@@ -552,6 +636,24 @@ def main():
             ", ".join(
                 candidatos.keys()
             )
+        )
+
+        mlflow.log_param(
+            "selection_criteria",
+            (
+                "Recall >= 0.70; highest PR-AUC; "
+                "tie Precision; lower FPR"
+            )
+        )
+
+        mlflow.log_param(
+            "best_candidate",
+            resumen["best_candidate"]
+        )
+
+        mlflow.log_param(
+            "registered_model",
+            resumen["registered_model"]
         )
 
         mlflow.log_param(
@@ -589,9 +691,31 @@ def main():
             git_commit
         )
 
-        mlflow.set_tag(
-            "validation_dataset",
-            "test"
+        mlflow.log_metrics(
+            {
+                "accuracy": resumen["accuracy"],
+                "precision": resumen["precision"],
+                "recall": resumen["recall"],
+                "f1_score": resumen["f1_score"],
+                "specificity": resumen["specificity"],
+                "false_positive_rate": resumen[
+                    "false_positive_rate"
+                ],
+                "g_mean": resumen["g_mean"],
+                "roc_auc": resumen["roc_auc"],
+                "pr_auc": resumen["pr_auc"],
+                "predicted_anomalies": resumen[
+                    "predicted_anomalies"
+                ],
+                "predicted_anomaly_rate": resumen[
+                    "predicted_anomaly_rate"
+                ]
+            }
+        )
+
+        mlflow.log_dict(
+            resumen,
+            "results/validation_summary.json"
         )
 
         mlflow.log_artifact(
@@ -630,6 +754,30 @@ def main():
             "FPR: "
             f"{resultado['false_positive_rate']:.4f}"
         )
+
+    print("\n==============================================")
+    print("CANDIDATO SELECCIONADO")
+    print("==============================================")
+
+    print(
+        resumen["best_candidate"]
+    )
+
+    print(
+        f"PR-AUC: {resumen['pr_auc']:.4f}"
+    )
+
+    print(
+        f"Recall: {resumen['recall']:.4f}"
+    )
+
+    print(
+        f"Precision: {resumen['precision']:.4f}"
+    )
+
+    print(
+        f"FPR: {resumen['false_positive_rate']:.4f}"
+    )
 
 
 if __name__ == "__main__":
