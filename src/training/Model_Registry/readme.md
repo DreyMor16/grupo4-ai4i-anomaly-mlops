@@ -22,24 +22,25 @@ Durante validación se había establecido como objetivo un Recall mínimo de 0.7
 
 ## Resultados
 
-| Modelo | PR-AUC Validación | PR-AUC Test | Recall Validación | Recall Test | Precision Test | FPR Test |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| LOF | 0.5080 | 0.4653 | **0.7222** | 0.5849 | 0.1902 | 0.0912 |
-| One-Class SVM | 0.4861 | 0.4921 | 0.7037 | **0.6792** | 0.2535 | 0.0733 |
+### Comparación entre validation y test
+
+| Modelo | PR-AUC Validation | PR-AUC Test | Recall Validation | Recall Test | Precision Test | FPR Test |
+|---|---:|---:|---:|---:|---:|---:|
+| LOF | 0.5080 | 0.4921 | 0.7222 | **0.6792** | 0.2535 | 0.0733 |
+| One-Class SVM | 0.4861 | 0.4653 | 0.7037 | 0.5849 | 0.1902 | 0.0912 |
 | Ensemble LOF + One-Class SVM | **0.5342** | **0.5116** | 0.7037 | 0.6415 | **0.2857** | **0.0587** |
+
 
 Los resultados muestran una reducción del desempeño de algunos modelos al pasar de validación a test, lo cual era esperable al evaluarlos sobre datos no utilizados durante la selección y ajuste de los modelos.
 
 Ninguno de los candidatos mantuvo en test el Recall mínimo de 0.70. One-Class SVM fue el modelo que quedó más cerca de este objetivo, con un Recall de 0.6792.
 
-Sin embargo, el ensemble mantuvo el mejor PR-AUC con 0.5116. Además, obtuvo la mayor Precision 7 el menor FPR.
+LOF obtuvo el mayor Recall en test, mientras que el ensemble mantuvo el mejor PR-AUC y además presentó la mayor Precision y el menor FPR.
+
+Como PR-AUC fue definida como la métrica principal de comparación, el ensemble LOF + One-Class SVM se mantiene como el modelo final seleccionado.
 
 ## Modelo seleccionado
 
-Se seleccionó como modelo final el **ensemble LOF + One-Class SVM con normalización Min-Max y pesos 0.6 / 0.4**.
-
-La selección se realizó principalmente por su PR-AUC, ya que esta fue definida como la métrica principal del proyecto para comparar modelos en un problema con clases desbalanceadas.
-
-Aunque el Recall disminuyó de 0.7037 en validación a 0.6415 en test, el ensemble presentó el mejor desempeño global entre los candidatos evaluados.
+Aunque el ensemble obtuvo el mayor PR-AUC en test, la mejora frente a LOF fue limitada. LOF presentó un Recall superior y ofrece una arquitectura considerablemente más simple para despliegue, mantenimiento y monitoreo. Por este motivo, se seleccionó LOF como modelo final, priorizando el balance entre desempeño y complejidad operativa.
 
 Es importante señalar que ninguno de los modelos alcanzó en test el Recall mínimo de 0.70 establecido durante validación, por lo que esta limitación debe considerarse en la interpretación y uso del modelo final.
