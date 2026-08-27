@@ -7,8 +7,8 @@ El conjunto de test permanece reservado para la evaluación final.
 """
 
 import hashlib
-import json
 import joblib
+import json
 import subprocess
 import sys
 
@@ -16,7 +16,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
-import mlflow.sklearn
 import numpy as np
 import pandas as pd
 
@@ -25,6 +24,7 @@ from sklearn.metrics import (
     average_precision_score,
     precision_recall_curve
 )
+
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.svm import OneClassSVM
 
@@ -33,32 +33,78 @@ from sklearn.svm import OneClassSVM
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(
-        0,
-        str(PROJECT_ROOT)
-    )
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 from src.feature_engineering.preprocessing import preprocesar_datos
-
 from src.training.evaluation import (
     calcular_metricas,
     crear_curva_precision_recall,
     crear_curva_roc,
     crear_matriz_confusion
 )
-
 from src.training.experiment_5.threshold_tuning import (
     evaluar_thresholds,
     seleccionar_threshold
 )
 
 
-from src.feature_engineering.preprocessing import preprocesar_datos
-from src.training.experiment_5.threshold_tuning import (
-    evaluar_thresholds,
-    seleccionar_threshold
-)
+# Modelo operativo con threshold ajustado
+class AnomalyThresholdModel(
+    mlflow.pyfunc.PythonModel
+):
+
+    def __init__(
+        self,
+        threshold
+    ):
+
+        self.threshold = threshold
+        self.model = None
+        self.preprocessor = None
+
+
+    # Cargar el modelo y el preprocesador
+    def load_context(
+        self,
+        context
+    ):
+
+        self.model = joblib.load(
+            context.artifacts["model"]
+        )
+
+        self.preprocessor = joblib.load(
+            context.artifacts["preprocessor"]
+        )
+
+
+    # Generar anomaly score y clasificación final
+    def predict(
+        self,
+        context,
+        model_input,
+        params=None
+    ):
+
+        X = self.preprocessor.transform(
+            model_input
+        )
+
+        anomaly_score = -self.model.decision_function(
+            X
+        )
+
+        prediction = (
+            anomaly_score >= self.threshold
+        ).astype(int)
+
+        return pd.DataFrame(
+            {
+                "anomaly_score": anomaly_score,
+                "prediction": prediction
+            }
+        )
 
 
 # Configuración general del experimento
@@ -358,7 +404,7 @@ def guardar_modelo_y_preprocessor(
 
     model_dir = (
         PROJECT_ROOT /
-        "models" /
+        "artifacts" /
         "experiment_5"
     )
 
@@ -395,6 +441,11 @@ def guardar_modelo_y_preprocessor(
     mlflow.log_artifact(
         str(preprocessor_path),
         artifact_path="preprocessor"
+    )
+
+    return (
+        model_path,
+        preprocessor_path
     )
 
 
@@ -726,30 +777,30 @@ def main():
             )
 
             # Guardar el modelo entrenado y el preprocesador utilizado
-            guardar_modelo_y_preprocessor(
+            (
+                model_path,
+                preprocessor_path
+            ) = guardar_modelo_y_preprocessor(
                 informacion["model"],
                 preprocessor,
                 nombre_archivo
             )
 
-            # Registrar el modelo como MLflow Model
-            if algoritmo == "LOF":
-
-                mlflow.sklearn.log_model(
-                    sk_model=informacion["model"],
-                    name="mlflow_model",
-                    skops_trusted_types=[
-                        "sklearn.metrics._dist_metrics.EuclideanDistance64",
-                        "sklearn.neighbors._kd_tree.KDTree"
-                    ]
+            # Registrar el modelo operativo con el threshold seleccionado
+            modelo_operativo = AnomalyThresholdModel(
+                threshold=float(
+                    mejor_threshold["threshold"]
                 )
+            )
 
-            else:
-
-                mlflow.sklearn.log_model(
-                    sk_model=informacion["model"],
-                    name="mlflow_model"
-                )
+            mlflow.pyfunc.log_model(
+                name="mlflow_model",
+                python_model=modelo_operativo,
+                artifacts={
+                    "model": str(model_path),
+                    "preprocessor": str(preprocessor_path)
+                }
+            )
 
             mlflow.log_dict(
                 resultado,
