@@ -36,7 +36,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-from src.feature_engineering.preprocessing import preprocesar_datos
+from src.feature_engineering.preprocessing import (
+    preparar_nuevos_datos,
+    preprocesar_datos
+)
 from src.training.evaluation import (
     calcular_metricas,
     crear_curva_precision_recall,
@@ -83,12 +86,14 @@ class AnomalyThresholdModel(
     def predict(
         self,
         context,
-        model_input: pd.DataFrame,
+        model_input,
         params=None
-    ) -> pd.DataFrame:
+    ):
 
-        X = self.preprocessor.transform(
-            model_input
+        X = preparar_nuevos_datos(
+            datos=model_input,
+            feature_set=FEATURE_SET,
+            preprocessor=self.preprocessor
         )
 
         anomaly_score = -self.model.decision_function(
@@ -500,11 +505,15 @@ def main():
         y_train,
         y_val,
         y_test,
-        preprocessor
+        preprocessor,
+        X_train_input,
+        X_val_input,
+        X_test_input
     ) = preprocesar_datos(
         feature_set=FEATURE_SET,
         approach=APPROACH,
-        random_state=RANDOM_STATE
+        random_state=RANDOM_STATE,
+        return_input_data=True
     )
 
     print(
@@ -799,7 +808,10 @@ def main():
                 artifacts={
                     "model": str(model_path),
                     "preprocessor": str(preprocessor_path)
-                }
+                },
+                input_example=X_val_input.head(
+                    5
+                ).copy()
             )
 
             mlflow.log_dict(

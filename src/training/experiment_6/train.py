@@ -51,6 +51,7 @@ from src.training.experiment_5.threshold_tuning import (
     seleccionar_threshold
 )
 from src.training.experiment_6.ensemble import (
+    EnsembleOperationalModel,
     calcular_minmax,
     combinar_cascada_lof_ocsvm,
     combinar_cascada_ocsvm_lof,
@@ -312,6 +313,11 @@ def guardar_modelo_y_preprocessor(
     mlflow.log_artifact(
         str(preprocessor_path),
         artifact_path="preprocessor"
+    )
+
+    return (
+        model_path,
+        preprocessor_path
     )
 
 
@@ -1993,11 +1999,15 @@ def main():
         y_train,
         y_val,
         y_test,
-        preprocessor
+        preprocessor,
+        X_train_input,
+        X_val_input,
+        X_test_input
     ) = preprocesar_datos(
         feature_set=FEATURE_SET,
         approach=APPROACH,
-        random_state=RANDOM_STATE
+        random_state=RANDOM_STATE,
+        return_input_data=True
     )
 
     feature_names = (
@@ -2014,6 +2024,50 @@ def main():
     ) = entrenar_modelos(
         X_train,
         X_val
+    )
+
+
+    # Guardar componentes para el modelo operativo final
+    final_artifacts_dir = (
+        PROJECT_ROOT /
+        "artifacts" /
+        "experiment_6" /
+        "operational_model"
+    )
+
+    final_artifacts_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    final_preprocessor_path = (
+        final_artifacts_dir /
+        "preprocessor.pkl"
+    )
+
+    final_lof_path = (
+        final_artifacts_dir /
+        "lof_model.pkl"
+    )
+
+    final_ocsvm_path = (
+        final_artifacts_dir /
+        "ocsvm_model.pkl"
+    )
+
+    joblib.dump(
+        preprocessor,
+        final_preprocessor_path
+    )
+
+    joblib.dump(
+        modelo_lof,
+        final_lof_path
+    )
+
+    joblib.dump(
+        modelo_ocsvm,
+        final_ocsvm_path
     )
 
     # Registrar modelos individuales
@@ -2431,6 +2485,56 @@ def main():
             str(all_results_json),
             artifact_path="results"
         )
+
+
+        # Registrar el ensemble ganador como MLflow Model
+        if (
+            resumen["best_method"] == "weighted_average"
+            and resumen["normalization"] == "minmax"
+        ):
+
+            normalization_config = {
+                "lof": lof_minmax,
+                "ocsvm": ocsvm_minmax
+            }
+
+            modelo_operativo = EnsembleOperationalModel(
+                normalization="minmax",
+                normalization_config=normalization_config,
+                lof_weight=float(
+                    resumen["lof_weight"]
+                ),
+                ocsvm_weight=float(
+                    resumen["ocsvm_weight"]
+                ),
+                threshold=float(
+                    resumen["selected_threshold"]
+                )
+            )
+
+            mlflow.log_dict(
+                normalization_config,
+                "config/operational_normalization.json"
+            )
+
+            mlflow.pyfunc.log_model(
+                name="mlflow_model",
+                python_model=modelo_operativo,
+                artifacts={
+                    "preprocessor": str(
+                        final_preprocessor_path
+                    ),
+                    "lof_model": str(
+                        final_lof_path
+                    ),
+                    "ocsvm_model": str(
+                        final_ocsvm_path
+                    )
+                },
+                input_example=X_val_input.head(
+                    5
+                ).copy()
+            )
 
     print("\n==============================================")
     print("RESULTADO FINAL DEL ENSEMBLE")

@@ -1,74 +1,11 @@
 """Funciones para normalizar y combinar anomaly scores."""
 
-import numpy as np
-import pandas as pd
-
-
-# Calcula parámetros de normalización Min-Max
-def calcular_minmax(
-    scores
-):
-
-    minimo = float(
-        np.min(scores)
-    )
-
-    maximo = float(
-        np.max(scores)
-    )
-
-    if maximo == minimo:
-        maximo = minimo + 1.0
-
-    return {
-        "min": minimo,
-        "max": maximo
-    }
-
-
-# Aplica normalización Min-Max
-def normalizar_minmax(
-    scores,
-    parametros
-):
-
-    return (
-        scores - parametros["min"]
-    ) / (
-        parametros["max"]
-        - parametros["min"]
-    )
-
-
-# Aplica normalización por Percentile Rank
-def normalizar_percentile_rank(
-    scores
-):
-
-    return (
-        pd.Series(scores)
-        .rank(
-            method="average",
-            pct=True
-        )
-        .to_numpy()
-    )
-
-
-# Combina scores mediante promedio ponderado
-def combinar_scores_ponderado(
-    lof_scores,
-    ocsvm_scores,
-    lof_weight,
-    ocsvm_weight
-):
-
-    return ("""Funciones para normalizar y combinar anomaly scores."""
-
 import joblib
 import mlflow
 import numpy as np
 import pandas as pd
+
+from src.feature_engineering.preprocessing import preparar_nuevos_datos
 
 
 # Calcula parámetros de normalización Min-Max
@@ -230,8 +167,10 @@ class EnsembleOperationalModel(
         params=None
     ) -> pd.DataFrame:
 
-        X = self.preprocessor.transform(
-            model_input
+        X = preparar_nuevos_datos(
+            datos=model_input,
+            feature_set="engineered_only",
+            preprocessor=self.preprocessor
         )
 
         lof_score = -self.lof_model.decision_function(
@@ -278,48 +217,3 @@ class EnsembleOperationalModel(
                 "prediction": prediction
             }
         )
-
-        lof_weight * lof_scores
-        + ocsvm_weight * ocsvm_scores
-    )
-
-
-# Aplica la primera etapa de la cascada con LOF
-def combinar_cascada_lof_ocsvm(
-    lof_scores,
-    ocsvm_scores,
-    lof_threshold
-):
-
-    return np.where(
-        lof_scores >= lof_threshold,
-        ocsvm_scores,
-        0.0
-    )
-
-
-# Aplica la primera etapa de la cascada con One-Class SVM
-def combinar_cascada_ocsvm_lof(
-    lof_scores,
-    ocsvm_scores,
-    ocsvm_threshold
-):
-
-    return np.where(
-        ocsvm_scores >= ocsvm_threshold,
-        lof_scores,
-        0.0
-    )
-
-
-# Combina scores tomando el valor mínimo
-def combinar_scores_minimo(
-    lof_scores,
-    ocsvm_scores
-):
-
-    return np.minimum(
-        lof_scores,
-        ocsvm_scores
-    )
-
