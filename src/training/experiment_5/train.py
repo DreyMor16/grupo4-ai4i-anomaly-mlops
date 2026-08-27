@@ -83,9 +83,9 @@ class AnomalyThresholdModel(
     def predict(
         self,
         context,
-        model_input,
+        model_input: pd.DataFrame,
         params=None
-    ):
+    ) -> pd.DataFrame:
 
         X = self.preprocessor.transform(
             model_input
