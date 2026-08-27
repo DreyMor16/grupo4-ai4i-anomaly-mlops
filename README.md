@@ -213,7 +213,19 @@ Códigos de salida:
 - `1`: alguna regla falla y se bloquea el entrenamiento.
 - `2`: existe un error técnico o de configuración.
 
-## 8. Exploratory data analysis (EDA)
+### 7.3 Pipeline de validación y entrenamiento
+
+Los Data Quality Gates se ejecutan automáticamente antes de iniciar cualquier experimento mediante:
+
+```powershell
+python src/pipeline/run_training.py --experiment 1
+```
+
+El argumento `--experiment` acepta valores del `1` al `6`.
+
+El pipeline genera el dataset raw si todavía no existe, ejecuta las reglas de calidad y solo permite continuar al entrenamiento cuando todas las validaciones son aprobadas. Si alguna regla falla, el entrenamiento se detiene con un código de salida diferente de cero.
+
+### 8. Exploratory data analysis (EDA)
 
 El diagnóstico exploratorio se encuentra en:
 
