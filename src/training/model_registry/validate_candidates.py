@@ -53,7 +53,7 @@ RANDOM_STATE = 42
 DATA_VERSION = "ai4i2020_v1"
 
 
-# Obtener automáticamente los modelos con alias candidate
+# Obtener automáticamente los modelos con alias candidate.
 def obtener_candidatos():
 
     client = MlflowClient()

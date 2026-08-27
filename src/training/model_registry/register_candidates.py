@@ -3,7 +3,7 @@ Registra automáticamente los modelos candidatos en MLflow Model Registry.
 
 No reentrena modelos.
 Busca los runs operacionales de los Experimentos 5 y 6 y registra
-el Logged Model asociado con nombre mlflow_model.
+el Logged Model asociado con nombre mlflow_model
 """
 
 import math

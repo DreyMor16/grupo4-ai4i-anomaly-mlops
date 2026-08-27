@@ -26,7 +26,7 @@ if str(PROJECT_ROOT) not in sys.path:
 MLFLOW_TRACKING_URI = "http://127.0.0.1:5000"
 
 
-# Modelo seleccionado para producción
+# Modelo seleccionado para producción.
 MODEL_NAME = "ai4i_lof_threshold_tuned"
 
 
