@@ -156,7 +156,7 @@ def preparar_nuevos_datos(
 
 def preprocesar_datos(
     feature_set,
-    approach="unsupervised",
+    approach="semi-supervised",
     data_path=None,
     random_state=42,
     return_input_data=False
