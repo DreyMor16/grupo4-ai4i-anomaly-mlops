@@ -34,10 +34,15 @@ artifacts/
 models/
 mlruns/
 mlartifacts/
+mlflow.db
+mlflow.db-shm
+mlflow.db-wal
 *.pkl
 *.pickle
 *.joblib
 *.onnx
+results/ 
+outputs/
 
 # Ejecución, logs y monitoreo local
 logs/
