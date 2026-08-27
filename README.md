@@ -457,25 +457,33 @@ La mejor configuración fue Weighted Average con normalización Min-Max y pesos 
 
 Los candidatos fueron registrados en Registry Model y posteriormente utilizados para la evaluación final.
 
+
 ### 9.2.2 Evaluación final en test
 
-| Modelo                       |     PR-AUC |     Recall |  Precision |        FPR |         
-| ---------------------------- | ---------: | ---------: | ---------: |  ---------: |
-| LOF                          |     0.4653 |     0.5849 |     0.1902 |     0.0912 |    
-| One-Class SVM                |     0.4921 | **0.6792** |     0.2535 |     0.0733 |     
-| Ensemble LOF + One-Class SVM | **0.5116** |     0.6415 | **0.2857** | **0.0587** | 
+| Modelo | PR-AUC | Recall | Precision | FPR |
+|---|---:|---:|---:|---:|
+| LOF | 0.4921 | **0.6792** | 0.2535 | 0.0733 |
+| One-Class SVM | 0.4653 | 0.5849 | 0.1902 | 0.0912 |
+| Ensemble LOF + One-Class SVM | **0.5116** | 0.6415 | **0.2857** | **0.0587** |
 
-Ninguno de los candidatos mantuvo en test el Recall mínimo de 0.70 definido durante validation.
+Ninguno de los candidatos mantuvo en test el Recall mínimo de 0.70 definido durante validation. 
 
-One-Class SVM obtuvo el mayor Recall en test, pero el ensemble presentó el mejor desempeño en la métrica principal del proyecto, PR-AUC, y además obtuvo mayor Precision, menor FPR y mayor F1.
 
-Por esta razón se seleccionó como modelo final:
+LOF obtuvo el mayor Recall en test, con 0.6792, mientras que el ensemble obtuvo el mayor PR-AUC, con 0.5116.
 
-Ensemble LOF + One-Class SVM
-Weighted Average
-Normalización Min-Max
-Peso LOF = 0.6
-Peso One-Class SVM = 0.4
+Aunque el ensemble presentó una mejora de PR-AUC frente a LOF, la diferencia fue de aproximadamente 0.02. Esta mejora se consideró limitada frente al aumento en complejidad operativa que implica mantener dos modelos, normalizar sus anomaly scores, combinar sus resultados y conservar una configuración adicional de pesos y threshold.
+
+LOF, además de presentar una arquitectura más simple, obtuvo el mayor Recall entre los candidatos evaluados en test. Considerando el balance entre desempeño, simplicidad de despliegue, mantenimiento y monitoreo, se seleccionó **LOF como modelo final para producción**.
+
+Configuración final:
+
+```text
+Modelo = LOF
+n_neighbors = 80
+contamination = 0.03
+feature_set = engineered_only
+approach = semi_supervised
+threshold = -0.0956274078
 
 
 ## 10. MLflow
