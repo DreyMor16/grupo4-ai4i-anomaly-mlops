@@ -35,9 +35,6 @@ Los resultados muestran una reducción del desempeño de algunos modelos al pasa
 
 Ninguno de los candidatos mantuvo en test el Recall mínimo de 0.70. One-Class SVM fue el modelo que quedó más cerca de este objetivo, con un Recall de 0.6792.
 
-LOF obtuvo el mayor Recall en test, mientras que el ensemble mantuvo el mejor PR-AUC y además presentó la mayor Precision y el menor FPR.
-
-Como PR-AUC fue definida como la métrica principal de comparación, el ensemble LOF + One-Class SVM se mantiene como el modelo final seleccionado.
 
 ## Modelo seleccionado
 
