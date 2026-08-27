@@ -36,7 +36,7 @@ APPROACH = "semi_supervised"
 RANDOM_STATE = 42
 
 
-# Obtener automáticamente los modelos con alias candidate
+# Obtener automáticamente los modelos con alias candidate.
 def obtener_candidatos():
 
     client = MlflowClient()
