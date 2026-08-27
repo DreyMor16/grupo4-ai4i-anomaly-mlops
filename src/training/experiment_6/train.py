@@ -2513,7 +2513,6 @@ def main():
                         final_ocsvm_path
                     )
                 },
-                input_example=X_val[:5]
             )
 
     print("\n==============================================")

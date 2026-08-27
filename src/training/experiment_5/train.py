@@ -794,7 +794,6 @@ def main():
                 artifacts={
                     "model": str(model_path)
                 },
-                input_example=X_val[:5]
             )
 
             mlflow.log_dict(
