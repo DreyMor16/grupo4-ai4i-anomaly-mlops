@@ -1,63 +1,74 @@
-# Experimento 1 — Baseline con ECOD
+# Experimento 1 - Baseline con ECOD
 
 ## Objetivo
 
-Establecer un punto de referencia inicial para el problema de detección de anomalías utilizando un modelo sencillo y completamente no supervisado.
+Establecer un punto de referencia inicial para el problema de detección de anomalías utilizando el algoritmo **ECOD** y comparando dos enfoques de entrenamiento:
 
-Se seleccionó **ECOD (Empirical Cumulative Distribution-based Outlier Detection)** como baseline debido a que requiere pocos hiperparámetros y permite obtener una referencia inicial antes de comparar modelos más complejos.
+- **Unsupervised:** el modelo se entrena con todos los registros disponibles en el conjunto de entrenamiento.
+- **Semi-supervised:** el modelo se entrena únicamente con los registros normales (`Machine failure = 0`).
+
+En ambos casos, `Machine failure` no se utiliza como variable predictora. En el enfoque semi-supervisado se utiliza únicamente para identificar las observaciones normales que formarán parte del entrenamiento.
 
 ## Configuración
 
-Para este experimento se utilizó:
+Se utilizó la misma configuración para ambos enfoques con el objetivo de realizar una comparación directa.
 
-- Algoritmo: `ECOD`
-- Feature set: `base`
-- Contamination: `0.03`
-- Random seed: `42`
-- Estrategia de entrenamiento: `unsupervised`
+| Parámetro | Valor |
+|---|---|
+| Algoritmo | ECOD |
+| Feature set | `base` |
+| Contamination | `0.03` |
 
-El modelo fue entrenado utilizando únicamente las variables predictoras. La variable `Machine failure` no participó en el entrenamiento y se utilizó únicamente para evaluar los resultados obtenidos sobre el conjunto de validación.
+El feature set `base` incluye las variables originales seleccionadas para el modelado:
 
-El conjunto de `test` se mantiene reservado para la evaluación final del modelo seleccionado.
+- `Type`
+- `Air temperature`
+- `Process temperature`
+- `Rotational speed`
+- `Torque`
+- `Tool wear`
+
+Las variables de identificación y los tipos específicos de falla no se utilizan como predictores.
+
+
+## Evaluación
+
+Los modelos se evalúan sobre el conjunto de validación utilizando `Machine failure` como referencia.
+
+Durante los experimentos iniciales se utiliza **PR-AUC como métrica principal de comparación**, debido al desbalance existente entre observaciones normales y fallas.
+
+También se registran las siguientes métricas:
+
+- Precision
+- Recall
+- False Positive Rate
+- Specificity
+- F1-score
+- ROC-AUC
+- G-Mean
+- Accuracy
+- Cantidad de anomalías predichas
+- Tasa de anomalías predichas
 
 ## Resultados
 
-Los resultados obtenidos sobre el conjunto de validación fueron:
+| Modelo | Enfoque | PR-AUC | ROC-AUC | Precision | Recall | F1 | FPR |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 01 | Unsupervised | 0.2008 | 0.7690 | 0.2564 | 0.1852 | 0.2151 | 0.0201 |
+| 02 | Semi-supervised | **0.2406** | **0.7873** | 0.2549 | **0.2407** | **0.2476** | 0.0263 |
 
-| Métrica | Resultado |
-|---|---:|
-| Accuracy | 0.9547 |
-| Precision | 0.2857 |
-| Recall | 0.2400 |
-| F1-score | 0.2609 |
-| ROC-AUC | 0.8318 |
-| PR-AUC | 0.2185 |
+El enfoque semi-supervisado obtuvo un mejor resultado en el baseline.
 
-El modelo identificó **42 observaciones como anomalías**, correspondientes aproximadamente al **2.8 % del conjunto de validación**.
+El PR-AUC fue mayor en el enfoque semi-supervisado, con un valor de 0.2406 frente a 0.2008 en el enfoque unsupervised. De igual forma, el recall fue mayor, con 0.2407 frente a 0.1852.
 
-## Interpretación
+La precision fue prácticamente igual en ambos enfoques. El enfoque semi-supervisado presentó una tasa de falsos positivos ligeramente mayor, con 0.0263 frente a 0.0201.
 
-El baseline muestra que ECOD logra identificar cierta separación entre observaciones normales y fallas, reflejada principalmente en un ROC-AUC de `0.8318`.
+## Conclusión
 
-Sin embargo, el PR-AUC de `0.2185` y el recall de `0.2400` muestran que todavía existe oportunidad de mejorar la detección de fallas.
+En este baseline, el enfoque semi-supervisado presentó un mejor desempeño que el enfoque unsupervised con ECOD, principalmente por obtener un mayor PR-AUC y recall, manteniendo una precision similar.
 
-Estos resultados se utilizarán como referencia para determinar si los siguientes experimentos, que incorporarán otros algoritmos, feature sets e hiperparámetros, logran una mejora real sobre el baseline.
+Sin embargo, este resultado corresponde únicamente a la configuración utilizada en este experimento: ECOD, feature set `base` y contamination `0.03`. Por esta razón, todavía no se descarta ninguno de los dos enfoques y ambos continuarán siendo evaluados en los siguientes experimentos.
 
-## Registro en MLflow
+Por esta razón, todavía no se descarta ninguno de los dos enfoques.
 
-La ejecución se registró en MLflow junto con la información necesaria para mantener trazabilidad y reproducibilidad:
-
-- parámetros del modelo;
-- feature set utilizado;
-- versión y hash de los datos;
-- commit de Git;
-- métricas de evaluación;
-- distribución de anomaly scores;
-- matriz de confusión;
-- curva ROC;
-- curva Precision-Recall;
-- configuración del experimento;
-- preprocesador utilizado;
-- modelo entrenado.
-
-El modelo del baseline se conserva como artefacto del run. El registro formal en **MLflow Model Registry** se realizará posteriormente para el modelo seleccionado como solución final.
+En los siguientes experimentos se continuará comparando **unsupervised y semi-supervised** utilizando otros algoritmos, conjuntos de variables e hiperparámetros.

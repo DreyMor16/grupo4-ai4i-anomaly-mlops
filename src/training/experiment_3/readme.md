@@ -1,28 +1,13 @@
-# Experimento 3 — Refinamiento de hiperparámetros
+## Experimento 3 - Primer ajuste de hiperparámetros
 
-## Objetivo
+El objetivo de este experimento es realizar un primer ajuste de hiperparámetros de los cuatro algoritmos de detección de anomalías, manteniendo la comparación entre los enfoques unsupervised y semi-supervised.
 
-Refinar las configuraciones de los algoritmos evaluados en el Experimento 2 para identificar la mejor combinación de:
+A partir de los resultados del Experimento 2 se elimina únicamente el feature set base, mientras que engineered, engineered_only y reduced continúan en evaluación.
 
-- algoritmo,
-- conjunto de variables (feature set),
-- e hiperparámetros.
+Se utilizará una primera búsqueda de hiperparámetros con el propósito de identificar tendencias iniciales sin realizar todavía una optimización exhaustiva sobre los modelos más prometedores. Los modelos serán evaluados sobre el conjunto de validación utilizando PR-AUC como métrica principal.
 
-La métrica principal para la comparación es **PR-AUC**, debido al desbalance existente entre observaciones normales y fallas. Como métricas complementarias se utilizan ROC-AUC, precision, recall y F1-score.
+El propósito de este experimento fue analizar si el ajuste de hiperparámetros modificaba el comportamiento observado en el Experimento 2 y determinar qué combinaciones de algoritmo, enfoque, feature set e hiperparámetros resultaban más prometedoras.
 
----
-
-## Feature sets evaluados
-
-A partir de los resultados del Experimento 2 se descartó el conjunto `base` y se continuó con:
-
-- `engineered`
-- `engineered_only`
-- `reduced`
-
-Esto permite evaluar conjuntamente el efecto del conjunto de variables y de los hiperparámetros de cada algoritmo.
-
----
 
 ## Algoritmos e hiperparámetros
 
@@ -30,85 +15,115 @@ Esto permite evaluar conjuntamente el efecto del conjunto de variables y de los 
 
 Se evaluó:
 
-- `contamination`: 0.02, 0.03, 0.04 y 0.06.
+- `contamination`: 0.02, 0.03, 0.05.
 
 ### Isolation Forest
 
 Se evaluaron combinaciones de:
 
-- `n_estimators`: 100, 200 y 300.
-- `max_samples`: `auto` y 512.
-- `contamination`: 0.02, 0.03, 0.04 y 0.06.
+- `n_estimators`: 100, 200.
+- `max_samples`: auto.
+- `contamination`: 0.02, 0.03, 0.05.
 
 ### Local Outlier Factor
 
 Se evaluaron combinaciones de:
 
-- `n_neighbors`: 10, 20, 40 y 60.
-- `contamination`: 0.02, 0.03, 0.04 y 0.06.
+- `n_neighbors`: 10, 20, 40.
+- `contamination`: 0.02, 0.03, 0.05.
 
 ### One-Class SVM
 
 Se evaluaron combinaciones de:
 
-- `nu`: 0.02, 0.03, 0.04 y 0.06.
-- `gamma`: scale, 0.01 y 0.1.
-- `kernel`: RBF.
+- `nu`: 0.02, 0.03, 0.05.
+- `gamma`: scale, auto.
 
-En total se ejecutaron **168 configuraciones de modelos**.
+En total se ejecutaron **144 configuraciones de modelos**.
 
 ---
 
 ## Selección de configuraciones
 
-Para cada algoritmo se seleccionó la configuración con mayor **PR-AUC**.
+Para cada algoritmo en cada enfoque, se seleccionó la configuración con mayor **PR-AUC**.
 
-Cuando dos configuraciones presentaban el mismo PR-AUC, se utilizó el **F1-score como criterio de desempate**.
+Cuando dos configuraciones presentaban el mismo PR-AUC, se utilizó recall como criterio de desempate.
 
-El conjunto de prueba (`test`) permaneció reservado y no se utilizó durante el refinamiento ni para seleccionar las configuraciones.
+## Resultados
 
----
+Para facilitar la comparación, se seleccionó la mejor configuración de cada algoritmo dentro de cada enfoque de entrenamiento.
 
-## Mejores resultados
-| Algoritmo            | Feature set       | Configuración seleccionada                                  |     PR-AUC |    ROC-AUC |  Precision |     Recall |   F1-score |
-| -------------------- | ----------------- | ----------------------------------------------------------- | ---------: | ---------: | ---------: | ---------: | ---------: |
-| **One-Class SVM**    | engineered_only | kernel=rbf, nu=0.06, gamma=0.01                       | **0.5068** |     0.8581 |     0.3256 | **0.5600** |     0.4118 |
-| **LOF**              | engineered_only | n_neighbors=60, contamination=0.02                      | **0.4627** | **0.8828** |     0.5758 |     0.3800 | **0.4578** |
-| **ECOD**             | engineered      | contamination=0.02                                        | **0.3994** |     0.8778 | **0.5926** |     0.3200 |     0.4156 |
-| **Isolation Forest** | engineered      | n_estimators=300, max_samples=512, contamination=0.02 | **0.3010** |     0.8323 |     0.4242 |     0.2800 |     0.3373 |
+### Mejores resultados del enfoque Unsupervised
 
----
+| Algoritmo | Feature set | Hiperparámetros | PR-AUC | Recall | Precision | FPR | ROC-AUC |
+|---|---|---|---:|---:|---:|---:|---:|
+| ECOD | reduced | contamination = 0.05 | 0.3466 | 0.3333 | 0.2813 | 0.0318 | 0.8546 |
+| Isolation Forest | engineered | n_estimators = 100, contamination = 0.05 | 0.1893 | 0.2963 | 0.2000 | 0.0443 | 0.7877 |
+| LOF | engineered_only | n_neighbors = 40, contamination = 0.05 | 0.3479 | 0.3519 | 0.2923 | 0.0318 | 0.8696 |
+| One-Class SVM | engineered_only | nu = 0.05, gamma = auto | **0.4061** | **0.4259** | **0.3433** | **0.0304** | 0.8687 |
 
-# Análisis de los resultados
+Dentro del enfoque unsupervised, One-Class SVM obtuvo el mayor PR-AUC, con un valor de 0.4061.
 
-El refinamiento permitió identificar diferencias importantes entre los algoritmos y sus hiperparámetros.
+LOF y ECOD obtuvieron resultados similares entre sí, mientras que Isolation Forest presentó el menor PR-AUC dentro de este enfoque.
 
-One-Class SVM obtuvo el mayor PR-AUC del experimento con 0.5068 utilizando el feature set engineered_only, nu=0.06 y gamma=0.01. Sin embargo, el mejor valor de nu corresponde al límite superior del rango evaluado, por lo que todavía existe la posibilidad de encontrar una configuración mejor ampliando ligeramente este parámetro.
+### Mejores resultados del enfoque Semi-supervised
 
-LOF obtuvo el segundo mejor resultado con un PR-AUC de 0.4627 utilizando engineered_only y n_neighbors=60. En este caso también se observa que el mejor valor de n_neighbors corresponde al límite superior de los valores evaluados, por lo que existe posibilidad de mejora al realizar una búsqueda adicional alrededor de esta configuración.
+| Algoritmo | Feature set | Hiperparámetros | PR-AUC | Recall | Precision | FPR | ROC-AUC |
+|---|---|---|---:|---:|---:|---:|---:|
+| ECOD | engineered_only | contamination = 0.05 | 0.4221 | 0.6111 | 0.3438 | 0.0436 | 0.8585 |
+| Isolation Forest | engineered | n_estimators = 100, contamination = 0.05 | 0.2053 | 0.3333 | 0.1978 | 0.0505 | 0.8024 |
+| LOF | engineered_only | n_neighbors = 40, contamination = 0.05 | **0.4933** | 0.5926 | 0.3265 | 0.0456 | **0.9044** |
+| One-Class SVM | engineered_only | nu = 0.02, gamma = scale | 0.4837 | 0.4630 | **0.4717** | **0.0194** | 0.8874 |
 
-Isolation Forest alcanzó un PR-AUC máximo de 0.3010 con 300 árboles y max_samples=512. Aunque el mejor número de árboles también se encuentra en el límite del rango evaluado, su desempeño continúa siendo considerablemente inferior al obtenido por One-Class SVM y LOF. Por lo cual, cualquier refinamiento adicional de este algoritmo será limitado y estará orientado principalmente a confirmar que aumentar la complejidad no produce una mejora relevante.
+Dentro del enfoque semi-supervised, LOF obtuvo el mayor PR-AUC del experimento, con un valor de 0.4933.
 
-En ECOD, el valor de contamination modificó la cantidad de observaciones clasificadas como anomalías y, por lo tanto, las métricas dependientes de la clasificación final. Sin embargo, el PR-AUC se mantuvo constante dentro de un mismo feature set. Esto indica que modificar contamination no cambia el ordenamiento de los anomaly scores, por lo que no se considera necesario ampliar nuevamente su búsqueda de hiperparámetros.
+One-Class SVM presentó un PR-AUC cercano, con 0.4837, pero obtuvo una Precision mayor y un FPR menor que LOF.
 
-## Decisión para el siguiente experimento
+Isolation Forest volvió a presentar el menor desempeño en términos de PR-AUC.
 
-A partir de estos resultados, no se realizará una nueva búsqueda exhaustiva sobre los cuatro algoritmos.
+## Comparación entre enfoques
 
-El Experimento 4 se enfocará principalmente en los dos modelos con mejor desempeño:
+| Algoritmo | Mejor PR-AUC Unsupervised | Mejor PR-AUC Semi-supervised | Enfoque con mayor PR-AUC |
+|---|---:|---:|---|
+| ECOD | 0.3466 | **0.4221** | Semi-supervised |
+| Isolation Forest | 0.1893 | **0.2053** | Semi-supervised |
+| LOF | 0.3479 | **0.4933** | Semi-supervised |
+| One-Class SVM | 0.4061 | **0.4837** | Semi-supervised |
 
-- One-Class SVM, refinando los valores de nu y gamma alrededor de la mejor configuración encontrada.
-- LOF, ampliando principalmente el rango de n_neighbors alrededor del valor 60.
+Después del ajuste de hiperparámetros, el enfoque semi-supervised presentó un PR-AUC mayor que el enfoque unsupervised en los cuatro algoritmos evaluados.
 
-Isolation Forest podrá incluirse en una búsqueda reducida para comprobar si aumentar n_estimators o max_samples genera alguna mejora adicional, aunque por su diferencia actual de PR-AUC no se considera uno de los principales candidatos.
+Este resultado es consistente con lo observado en el Experimento 2 y en el experimento 1, donde el enfoque semi-supervised también presentó mejores resultados de PR-AUC.
 
-ECOD no requiere una nueva búsqueda de contamination, ya que este parámetro no produjo cambios en PR-AUC.
+## Análisis de los resultados
 
+El ajuste de hiperparámetros permitió mejorar el comportamiento de algunas configuraciones, especialmente en LOF y One-Class SVM.
+
+LOF semi-supervised con engineered_only y n_neighbors = 40 presentó el mayor PR-AUC del experimento, con 0.4933.
+
+One-Class SVM semi-supervised con engineered_only, nu = 0.02 y gamma = scale presentó un PR-AUC de 0.4837. Aunque su PR-AUC fue ligeramente menor que el de LOF, obtuvo una Precision mayor y un FPR considerablemente menor.
+
+ECOD semi-supervised obtuvo un PR-AUC de 0.4221 y alcanzó el mayor Recall entre las mejores configuraciones, con 0.6111.
+
+Isolation Forest presentó los valores de PR-AUC más bajos tanto en el enfoque unsupervised como en el semi-supervised.
+
+También se observó que engineered_only continuó siendo el feature set más favorable para ECOD, LOF y One-Class SVM dentro del enfoque semi-supervised.
 
 ## Conclusión
 
-El Experimento 3 permitió reducir significativamente el espacio de búsqueda.
+Los resultados del Experimento 3 confirman que el enfoque semi-supervised fue más favorable que el enfoque unsupervised para los cuatro algoritmos evaluados, incluso después del ajuste de hiperparámetros.
 
-Los dos principales candidatos son One-Class SVM y LOF, ambos con el feature set engineered_only. One-Class SVM obtuvo el mayor PR-AUC, mientras que LOF mostró un mejor equilibrio entre precision y F1-score en su mejor configuración.
+Esta tendencia ya había sido observada en el Experimento 2 y se mantuvo después de ampliar la búsqueda de configuraciones, por lo que a partir del siguiente experimento se continuará únicamente con el enfoque semi-supervised.
 
-Debido a que los mejores valores de algunos hiperparámetros se encontraron en los límites de los rangos evaluados, se realizará un refinamiento de hiperparámetros adicional para ver si mejora el desempeño del modelo.
+En cuanto a los algoritmos, LOF obtuvo el mayor PR-AUC del experimento, con 0.4933. One-Class SVM obtuvo un resultado cercano, con 0.4837, y presentó una mayor Precision y un menor FPR. ECOD también se mantiene como una alternativa relevante debido a que alcanzó el mayor Recall entre las mejores configuraciones semi-supervised.
+
+Isolation Forest presentó nuevamente un desempeño considerablemente menor en términos de PR-AUC, incluso después del ajuste de hiperparámetros, por lo que no será priorizado en la siguiente etapa.
+
+Los resultados también continúan favoreciendo al feature set engineered_only, que produjo las mejores configuraciones de ECOD, LOF y One-Class SVM dentro del enfoque semi-supervised.
+
+El siguiente experimento estará orientado a un refinamiento de los hiperparámetros de los modelos más prometedores. Se continuará utilizando únicamente el enfoque semi-supervised y el feature set engineered_only.
+
+En el caso de LOF, se realizará una búsqueda más específica alrededor de n_neighbors, ya que el mejor resultado se obtuvo con n_neighbors = 40, que correspondía al valor más alto evaluado en este experimento. Esto indica que todavía es conveniente explorar valores cercanos y superiores antes de considerar cerrado el ajuste del modelo.
+
+Para One-Class SVM se realizará un refinamiento de nu y gamma, con el objetivo de explorar con mayor detalle las configuraciones cercanas a las que presentaron mejores resultados.
+
+ECOD se mantendrá como modelo candidato para las siguientes etapas. Sin embargo, no se realizará una búsqueda extensa adicional de hiperparámetros, debido a que dispone de un espacio de ajuste más limitado y las variaciones de contamination afectan principalmente el punto de decisión sobre los anomaly scores.
