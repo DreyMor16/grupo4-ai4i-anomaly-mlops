@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import tempfile
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -107,6 +108,35 @@ def encontrar_preprocessor(client, run_id):
     return candidatos[0]
 
 
+def normalizar_rutas_mlmodel(ruta_modelo):
+    """Convierte las rutas internas del MLmodel al formato portable con /."""
+
+    ruta_mlmodel = ruta_modelo / "MLmodel"
+
+    if not ruta_mlmodel.exists():
+        raise FileNotFoundError(
+            f"No se encontró el archivo MLmodel: {ruta_mlmodel}"
+        )
+
+    contenido = ruta_mlmodel.read_text(
+        encoding="utf-8"
+    )
+
+    contenido_normalizado = re.sub(
+        r"(?m)^(\s+path:\s+)(.+)$",
+        lambda coincidencia: (
+            coincidencia.group(1)
+            + coincidencia.group(2).replace("\\", "/")
+        ),
+        contenido,
+    )
+
+    ruta_mlmodel.write_text(
+        contenido_normalizado,
+        encoding="utf-8",
+    )
+
+
 def main():
     """Construye el bundle local de producción."""
 
@@ -165,7 +195,11 @@ def main():
             modelo_descargado,
             RUTA_MODELO,
         )
-
+        # MLflow puede guardar separadores de Windows dentro de MLmodel.
+        # Se normalizan para que el bundle funcione también en Docker/Linux.
+        normalizar_rutas_mlmodel(
+            RUTA_MODELO
+        )
         preprocessor_descargado = (
             client.download_artifacts(
                 run_id=run_id,

@@ -769,7 +769,117 @@ Por esta razón, para procesar nuevos registros se debe recuperar desde MLflow a
 
 ## 11. Docker
 
-Pendiente. Aquí se incluirán los comandos para construir y ejecutar el contenedor.
+La API puede ejecutarse dentro de un contenedor Docker sin mantener una conexión activa con el servidor de MLflow.
+
+La imagen utiliza:
+
+- Python 3.13;
+- un usuario sin privilegios;
+- dependencias exclusivas de serving;
+- verificación automática de salud;
+- el modelo y el preprocessor exportados desde el mismo run de MLflow.
+
+### 11.1 Preparar el bundle
+
+Antes de construir la imagen, el servidor de MLflow debe estar activo y el modelo debe tener el alias `production`.
+
+Ejecutar:
+
+```powershell
+python src/api/export_production_bundle.py
+```
+
+El comando genera:
+
+```text
+artifacts/production/
+├── model/
+├── preprocessor.pkl
+└── metadata.json
+```
+
+El exportador normaliza las rutas internas del modelo para que el bundle funcione tanto en Windows como en Linux.
+
+Los artefactos permanecen excluidos de Git. Por esta razón, la exportación debe ejecutarse antes de construir una imagen nueva.
+
+### 11.2 Construir la imagen
+
+Con Docker Desktop activo, ejecutar desde la raíz del proyecto:
+
+```powershell
+docker build -t grupo4-mlops .
+```
+
+### 11.3 Levantar el servicio
+
+```powershell
+docker run -d --name grupo4-mlops-api -p 8000:8000 grupo4-mlops
+```
+
+La API queda disponible en:
+
+```text
+http://127.0.0.1:8000
+```
+
+La documentación interactiva puede abrirse en:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 11.4 Verificar el contenedor
+
+Consultar el estado:
+
+```powershell
+docker ps --filter "name=grupo4-mlops-api"
+```
+
+Probar el endpoint de salud:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health |
+    ConvertTo-Json
+```
+
+La respuesta esperada incluye:
+
+```json
+{
+  "status": "ok",
+  "model_loaded": true,
+  "preprocessor_loaded": true,
+  "model_name": "ai4i_lof_threshold_tuned",
+  "model_version": "1"
+}
+```
+
+Consultar los logs:
+
+```powershell
+docker logs grupo4-mlops-api
+```
+
+Detener el servicio:
+
+```powershell
+docker stop grupo4-mlops-api
+```
+
+Volver a iniciarlo:
+
+```powershell
+docker start grupo4-mlops-api
+```
+
+Eliminar el contenedor detenido:
+
+```powershell
+docker rm grupo4-mlops-api
+```
+
+El contenedor carga el bundle local durante el arranque. Una vez construida la imagen, la inferencia no depende del servidor de MLflow ni de archivos existentes fuera del contenedor.
 
 ## 12. API
 
