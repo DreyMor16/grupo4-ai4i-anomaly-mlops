@@ -1,0 +1,46 @@
+# Git y entornos locales
+.git/
+.gitignore
+.gitattributes
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Cachés de Python y pruebas
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Contenido que no necesita la API
+data/
+notebooks/
+reports/
+results/
+outputs/
+models/
+mlruns/
+mlartifacts/
+mlflow.db
+mlflow.db-shm
+mlflow.db-wal
+logs/
+monitoring_output/
+tests/
+docs/
+
+# Excluir artefactos generales, pero incluir el bundle de producción
+artifacts/*
+!artifacts/production/
+!artifacts/production/**
+
+# Archivos locales
+*.log
+*.pid
+.DS_Store
+Thumbs.db
+desktop.ini
