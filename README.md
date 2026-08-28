@@ -773,7 +773,73 @@ Pendiente. Aquí se incluirán los comandos para construir y ejecutar el contene
 
 ## 12. API
 
-Pendiente. La API deberá recibir datos de una máquina y responder si son normales o anómalos.
+La inferencia se expone mediante FastAPI utilizando el modelo LOF registrado con alias `production`.
+
+### 12.1 Exportar el bundle de producción
+
+Con el servidor de MLflow activo, ejecutar:
+
+```powershell
+python src/api/export_production_bundle.py
+```
+
+Este comando recupera el modelo PyFunc con alias `production` y el preprocessor almacenado en el mismo `run_id`. Los artefactos se guardan localmente en:
+
+```text
+artifacts/production/
+├── model/
+├── preprocessor.pkl
+└── metadata.json
+```
+
+El bundle está excluido de Git y permite ejecutar la API sin mantener una conexión activa con MLflow. El preprocessor se carga con las transformaciones aprendidas durante entrenamiento; no se vuelve a ajustar con datos nuevos.
+
+### 12.2 Iniciar la API
+
+```powershell
+python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+```
+
+La documentación interactiva queda disponible en:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 12.3 Endpoints
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| GET | `/health` | Verifica que el modelo y el preprocessor estén cargados |
+| POST | `/predict` | Realiza una inferencia individual |
+| POST | `/predict/batch` | Realiza inferencia para un lote de hasta 1000 máquinas |
+
+Ejemplo de entrada:
+
+```json
+{
+  "Type": "L",
+  "Air temperature": 298.9,
+  "Process temperature": 309.1,
+  "Rotational speed": 2861,
+  "Torque": 4.6,
+  "Tool wear": 143
+}
+```
+
+Ejemplo de respuesta:
+
+```json
+{
+  "anomaly": true,
+  "prediction": 1,
+  "anomaly_score": 1.8711027503676605,
+  "model_name": "ai4i_lof_threshold_tuned",
+  "model_version": "1"
+}
+```
+
+LOF no produce probabilidades calibradas. La API devuelve un `anomaly_score`: cuanto mayor sea el valor, más anómalo es el registro. La clasificación final se obtiene aplicando el umbral validado y almacenado dentro del modelo de producción.
 
 ## 13. Monitoring
 
