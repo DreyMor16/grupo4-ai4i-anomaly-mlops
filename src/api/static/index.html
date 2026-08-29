@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="Interfaz para detectar anomalías en maquinaria con el modelo LOF de AI4I."
+    >
+
+    <title>AI4I — Detector de anomalías</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/styles.css?v=3"
+    >
+</head>
+
+<body>
+    <a class="skip-link" href="#main-content">
+        Ir al contenido principal
+    </a>
+
+    <header class="topbar">
+        <a class="brand" href="/ui">
+            <span class="brand-mark">A4</span>
+
+            <span class="brand-text">
+                <strong>AI4I Anomaly Detector</strong>
+                <small>Mantenimiento predictivo</small>
+            </span>
+        </a>
+
+        <div class="topbar-actions">
+            <a
+                class="docs-link"
+                href="/docs"
+                target="_blank"
+            >
+                Swagger
+            </a>
+
+            <div
+                id="service-status"
+                class="service-status checking"
+                role="status"
+                aria-live="polite"
+            >
+                <span class="status-dot"></span>
+                <span id="status-text">Verificando API</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="main-content" class="container">
+        <section class="intro">
+            <div>
+                <p class="eyebrow">
+                    Sistema MLOps · Grupo 4
+                </p>
+
+                <h1>
+                    Detección de anomalías en maquinaria
+                </h1>
+
+                <p class="intro-description">
+                    Ingresa las condiciones operativas de una máquina
+                    para identificar comportamientos asociados con fallas.
+                </p>
+            </div>
+
+            <div class="model-info">
+                <span class="production-badge">
+                    Producción
+                </span>
+
+                <span
+                    id="hero-model-name"
+                    class="model-name"
+                >
+                    Cargando modelo...
+                </span>
+
+                <span class="model-version">
+                    Versión
+                    <strong id="hero-model-version">—</strong>
+                </span>
+            </div>
+        </section>
+
+        <section class="workspace">
+            <div
+                class="tabs"
+                role="tablist"
+                aria-label="Tipo de predicción"
+            >
+                <button
+                    class="tab-button active"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="individual-panel"
+                    data-tab="individual-panel"
+                >
+                    Predicción individual
+                </button>
+
+                <button
+                    class="tab-button"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="batch-panel"
+                    data-tab="batch-panel"
+                >
+                    Cargar archivo CSV
+                </button>
+            </div>
+
+            <div
+                id="individual-panel"
+                class="tab-panel"
+                role="tabpanel"
+            >
+                <div class="content-grid">
+                    <section class="card">
+                        <header class="card-header">
+                            <div>
+                                <h2>Condiciones de la máquina</h2>
+
+                                <p>
+                                    Utiliza las unidades originales del
+                                    dataset AI4I.
+                                </p>
+                            </div>
+                        </header>
+
+                        <form id="predict-form">
+                            <div class="form-grid">
+                                <div class="field">
+                                    <label for="type">
+                                        Tipo de producto
+                                    </label>
+
+                                    <select id="type" required>
+                                        <option value="L">
+                                            L — Calidad baja
+                                        </option>
+
+                                        <option value="M">
+                                            M — Calidad media
+                                        </option>
+
+                                        <option value="H">
+                                            H — Calidad alta
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="field">
+                                    <label for="air-temperature">
+                                        Temperatura del aire
+                                    </label>
+
+                                    <div class="input-with-unit">
+                                        <input
+                                            id="air-temperature"
+                                            type="number"
+                                            step="0.1"
+                                            required
+                                        >
+
+                                        <span>K</span>
+                                    </div>
+                                </div>
+
+                                <div class="field">
+                                    <label for="process-temperature">
+                                        Temperatura del proceso
+                                    </label>
+
+                                    <div class="input-with-unit">
+                                        <input
+                                            id="process-temperature"
+                                            type="number"
+                                            step="0.1"
+                                            required
+                                        >
+
+                                        <span>K</span>
+                                    </div>
+                                </div>
+
+                                <div class="field">
+                                    <label for="rotational-speed">
+                                        Velocidad rotacional
+                                    </label>
+
+                                    <div class="input-with-unit">
+                                        <input
+                                            id="rotational-speed"
+                                            type="number"
+                                            step="1"
+                                            min="1"
+                                            required
+                                        >
+
+                                        <span>rpm</span>
+                                    </div>
+                                </div>
+
+                                <div class="field">
+                                    <label for="torque">
+                                        Torque
+                                    </label>
+
+                                    <div class="input-with-unit">
+                                        <input
+                                            id="torque"
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            required
+                                        >
+
+                                        <span>Nm</span>
+                                    </div>
+                                </div>
+
+                                <div class="field">
+                                    <label for="tool-wear">
+                                        Desgaste de herramienta
+                                    </label>
+
+                                    <div class="input-with-unit">
+                                        <input
+                                            id="tool-wear"
+                                            type="number"
+                                            step="1"
+                                            min="0"
+                                            required
+                                        >
+
+                                        <span>min</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-footer">
+                                <div class="example-buttons">
+                                    <span>Ejemplos:</span>
+
+                                    <button
+                                        id="load-normal"
+                                        class="text-button"
+                                        type="button"
+                                    >
+                                        Máquina normal
+                                    </button>
+
+                                    <button
+                                        id="load-anomaly"
+                                        class="text-button danger"
+                                        type="button"
+                                    >
+                                        Posible anomalía
+                                    </button>
+                                </div>
+
+                                <button
+                                    id="predict-button"
+                                    class="primary-button"
+                                    type="submit"
+                                >
+                                    <span class="button-label">
+                                        Evaluar máquina
+                                    </span>
+
+                                    <span
+                                        class="button-loader"
+                                        aria-hidden="true"
+                                    ></span>
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section
+                        id="single-result"
+                        class="card result-card empty"
+                        aria-live="polite"
+                    >
+                        <div class="result-empty">
+                            <div class="empty-symbol">—</div>
+
+                            <h2>Sin predicción</h2>
+
+                            <p>
+                                Completa el formulario y presiona
+                                “Evaluar máquina”.
+                            </p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div
+                id="batch-panel"
+                class="tab-panel"
+                role="tabpanel"
+                hidden
+            >
+                <div class="content-grid">
+                    <section class="card">
+                        <header class="card-header">
+                            <div>
+                                <h2>Archivo de máquinas</h2>
+
+                                <p>
+                                    Carga un archivo CSV con una máquina
+                                    por fila.
+                                </p>
+                            </div>
+
+                            <button
+                                id="download-template"
+                                class="secondary-button"
+                                type="button"
+                            >
+                                Descargar plantilla
+                            </button>
+                        </header>
+
+                        <form id="batch-form">
+                            <label
+                                id="drop-zone"
+                                class="file-drop"
+                                for="batch-file"
+                            >
+                                <input
+                                    id="batch-file"
+                                    type="file"
+                                    accept=".csv,text/csv"
+                                    hidden
+                                >
+
+                                <span class="file-icon">CSV</span>
+
+                                <strong>
+                                    Selecciona o arrastra un archivo
+                                </strong>
+
+                                <small>
+                                    Máximo 1.000 registros
+                                </small>
+                            </label>
+
+                            <div
+                                id="file-selection"
+                                class="file-selection"
+                                hidden
+                            >
+                                <div>
+                                    <strong id="file-name"></strong>
+                                    <span id="file-meta"></span>
+                                </div>
+
+                                <button
+                                    id="clear-batch"
+                                    class="remove-file"
+                                    type="button"
+                                >
+                                    Quitar
+                                </button>
+                            </div>
+
+                            <button
+                                id="batch-button"
+                                class="primary-button batch-submit"
+                                type="submit"
+                                disabled
+                            >
+                                <span class="button-label">
+                                    Procesar archivo
+                                </span>
+
+                                <span
+                                    class="button-loader"
+                                    aria-hidden="true"
+                                ></span>
+                            </button>
+                        </form>
+                    </section>
+
+                    <section class="card batch-result-card">
+                        <div id="batch-empty" class="result-empty">
+                            <div class="empty-symbol">—</div>
+
+                            <h2>Sin archivo procesado</h2>
+
+                            <p>
+                                Los resultados aparecerán aquí después
+                                de procesar el CSV.
+                            </p>
+                        </div>
+
+                        <div id="batch-output" hidden>
+                            <header class="card-header">
+                                <div>
+                                    <h2>Resultado del lote</h2>
+
+                                    <p>
+                                        La tabla muestra únicamente las
+                                        anomalías detectadas.
+                                    </p>
+                                </div>
+                            </header>
+
+                            <div
+                                id="batch-summary"
+                                class="batch-summary"
+                            ></div>
+
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Fila del archivo</th>
+                                            <th>Estado</th>
+                                            <th>Predicción</th>
+                                            <th>Anomaly score</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody id="batch-table-body"></tbody>
+                                </table>
+                            </div>
+
+                            <div
+                                id="batch-pagination"
+                                class="pagination"
+                                hidden
+                            >
+                                <button
+                                    id="batch-previous"
+                                    class="pagination-button"
+                                    type="button"
+                                >
+                                    Anterior
+                                </button>
+
+                                <span id="batch-page-info">
+                                    Página 1 de 1
+                                </span>
+
+                                <button
+                                    id="batch-next"
+                                    class="pagination-button"
+                                    type="button"
+                                >
+                                    Siguiente
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        <p class="score-note">
+            El anomaly score expresa qué tan inusual es un registro.
+            No representa una probabilidad calibrada.
+        </p>
+    </main>
+
+    <footer class="footer">
+        <span>
+            AI4I 2020 · Detector LOF · Grupo 4
+        </span>
+
+        <div>
+            <a href="/health" target="_blank">Estado</a>
+            <a href="/docs" target="_blank">API</a>
+        </div>
+    </footer>
+
+    <div
+        id="toast"
+        class="toast"
+        role="status"
+        aria-live="polite"
+    ></div>
+
+    <script src="/static/app.js?v=3"></script>
+</body>
+</html>

@@ -9,6 +9,8 @@ import joblib
 import mlflow
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.api.schemas import (
     BatchPredictionRequest,
@@ -23,6 +25,18 @@ from src.feature_engineering.preprocessing import (
 
 
 RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
+
+DIRECTORIO_STATIC = (
+    RAIZ_PROYECTO
+    / "src"
+    / "api"
+    / "static"
+)
+
+RUTA_INTERFAZ = (
+    DIRECTORIO_STATIC
+    / "index.html"
+)
 
 DIRECTORIO_BUNDLE = Path(
     os.getenv(
@@ -136,6 +150,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.mount(
+    "/static",
+    StaticFiles(
+        directory=str(DIRECTORIO_STATIC)
+    ),
+    name="static",
+)
 
 def generar_predicciones(
     request,
@@ -201,6 +222,16 @@ def generar_predicciones(
             ),
         ) from error
 
+@app.get(
+    "/ui",
+    include_in_schema=False,
+)
+def interfaz_web():
+    """Muestra la interfaz gráfica para consumir la API."""
+
+    return FileResponse(
+        RUTA_INTERFAZ
+    )
 
 @app.get(
     "/",
@@ -211,6 +242,7 @@ def root():
 
     return {
         "service": "AI4I Anomaly Detection API",
+        "interface": "/ui",
         "documentation": "/docs",
         "health": "/health",
     }
