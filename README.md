@@ -948,6 +948,14 @@ Ejemplo de respuesta:
   "model_version": "1"
 }
 ```
+### Interfaz web
+
+La API incluye una interfaz web opcional para facilitar las demostraciones y el consumo del modelo sin escribir solicitudes JSON manualmente.
+
+Con el servicio en ejecución, abrir:
+
+```text
+http://127.0.0.1:8000/ui
 
 LOF no produce probabilidades calibradas. La API devuelve un `anomaly_score`: cuanto mayor sea el valor, más anómalo es el registro. La clasificación final se obtiene aplicando el umbral validado y almacenado dentro del modelo de producción.
 
@@ -974,8 +982,8 @@ ai4i_lof_threshold_tuned
 
 | Integrante | Participación |
 |---|---|
-| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración de cambios, verificación del pipeline y ejecución reproducible de los experimentos en MLflow. |
-| Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, ajuste de hiperparámetros y thresholds, automatización del Model Registry y documentación de los experimentos. |
+| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración y verificación del pipeline, ejecución reproducible de experimentos en MLflow, exportación del modelo de producción, desarrollo de la API con FastAPI, predicción individual y por lotes, interfaz web, contenerización con Docker y documentación de ejecución. |
+| Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, comparación de detectores de anomalías, ajuste de hiperparámetros y thresholds, creación y evaluación del ensemble, automatización de MLflow Model Registry, validación final de candidatos y documentación de los experimentos. |
 
 Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.
 
