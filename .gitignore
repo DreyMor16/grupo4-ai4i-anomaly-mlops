@@ -59,3 +59,7 @@ desktop.ini
 
 # Reporte dinámico del Data Quality Gate
 reports/validation/data_quality_report.json
+
+# Reporte dinámico de monitoreo
+
+reports/monitoring/monitoring_report.json

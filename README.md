@@ -812,21 +812,46 @@ docker build -t grupo4-mlops .
 
 ### 11.3 Levantar el servicio
 
+Crear los directorios que persistirán fuera del contenedor:
+
 ```powershell
-docker run -d --name grupo4-mlops-api -p 8000:8000 grupo4-mlops
+New-Item -ItemType Directory -Path "logs/monitoring" -Force
+New-Item -ItemType Directory -Path "reports/monitoring" -Force
 ```
 
-La API queda disponible en:
+Resolver sus rutas absolutas:
 
-```text
-http://127.0.0.1:8000
+```powershell
+$monitoringLogs = (
+    Resolve-Path "logs/monitoring"
+).Path
+
+$monitoringReports = (
+    Resolve-Path "reports/monitoring"
+).Path
 ```
 
-La documentación interactiva puede abrirse en:
+Levantar el servicio con montajes persistentes:
 
-```text
-http://127.0.0.1:8000/docs
+```powershell
+docker run -d `
+  --name grupo4-mlops-api `
+  -p 8000:8000 `
+  --mount "type=bind,source=$monitoringLogs,target=/app/logs/monitoring" `
+  --mount "type=bind,source=$monitoringReports,target=/app/reports/monitoring" `
+  grupo4-mlops
 ```
+
+El servicio queda disponible en:
+
+| Componente | Dirección |
+|---|---|
+| API | `http://127.0.0.1:8000` |
+| Interfaz de inferencia | `http://127.0.0.1:8000/ui` |
+| Panel de monitoreo | `http://127.0.0.1:8000/monitoring` |
+| Swagger | `http://127.0.0.1:8000/docs` |
+
+Los montajes permiten que los logs y reportes permanezcan disponibles en Windows incluso después de reemplazar el contenedor.
 
 ### 11.4 Verificar el contenedor
 
@@ -834,6 +859,12 @@ Consultar el estado:
 
 ```powershell
 docker ps --filter "name=grupo4-mlops-api"
+```
+
+El estado esperado es:
+
+```text
+Up ... (healthy)
 ```
 
 Probar el endpoint de salud:
@@ -855,7 +886,19 @@ La respuesta esperada incluye:
 }
 ```
 
-Consultar los logs:
+Ejecutar el monitoreo dentro del contenedor:
+
+```powershell
+docker exec grupo4-mlops-api python src/monitoring/run_monitoring.py
+```
+
+Verificar que el reporte fue persistido en el host:
+
+```powershell
+Get-Item "reports/monitoring/monitoring_report.json"
+```
+
+Consultar los logs del contenedor:
 
 ```powershell
 docker logs grupo4-mlops-api
@@ -879,7 +922,9 @@ Eliminar el contenedor detenido:
 docker rm grupo4-mlops-api
 ```
 
-El contenedor carga el bundle local durante el arranque. Una vez construida la imagen, la inferencia no depende del servidor de MLflow ni de archivos existentes fuera del contenedor.
+Los archivos almacenados en `logs/monitoring/` y `reports/monitoring/` no se eliminan con el contenedor.
+
+El modelo, preprocessor, referencia y umbrales forman parte de la imagen. Una vez construida, la inferencia y el monitoreo no requieren una conexión activa con MLflow.
 
 ## 12. API
 
@@ -920,9 +965,11 @@ http://127.0.0.1:8000/docs
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| GET | `/health` | Verifica que el modelo y el preprocessor estén cargados |
+| GET | `/` | Describe el servicio y sus rutas principales |
+| GET | `/health` | Verifica que modelo y preprocessor estén cargados |
 | POST | `/predict` | Realiza una inferencia individual |
-| POST | `/predict/batch` | Realiza inferencia para un lote de hasta 1000 máquinas |
+| POST | `/predict/batch` | Procesa un lote de hasta 1.000 máquinas |
+| GET | `/monitoring/report` | Devuelve el último reporte de monitoreo |
 
 Ejemplo de entrada:
 
@@ -948,20 +995,50 @@ Ejemplo de respuesta:
   "model_version": "1"
 }
 ```
-### Interfaz web
 
-La API incluye una interfaz web opcional para facilitar las demostraciones y el consumo del modelo sin escribir solicitudes JSON manualmente.
+### 12.4 Interfaces web
 
-Con el servicio en ejecución, abrir:
+La aplicación contiene dos interfaces separadas.
+
+Inferencia individual y por lotes:
 
 ```text
 http://127.0.0.1:8000/ui
 ```
-LOF no produce probabilidades calibradas. La API devuelve un `anomaly_score`: cuanto mayor sea el valor, más anómalo es el registro. La clasificación final se obtiene aplicando el umbral validado y almacenado dentro del modelo de producción.
+
+Monitoreo de sistema, datos y modelo:
+
+```text
+http://127.0.0.1:8000/monitoring
+```
+
+La interfaz de inferencia permite:
+
+- completar un formulario individual;
+- cargar ejemplos normales o anómalos;
+- cargar un CSV de hasta 1.000 registros;
+- mostrar únicamente las anomalías del lote;
+- paginar los resultados de diez en diez.
+
+El panel de monitoreo permite:
+
+- comprobar latencia, throughput, error rate y disponibilidad;
+- revisar PSI y Jensen-Shannon por variable;
+- comparar la tasa de anomalías con validación;
+- revisar la distribución del `anomaly_score`;
+- consultar alertas y la recomendación de reentrenamiento.
+
+Swagger permanece disponible en:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+LOF no produce probabilidades calibradas. La API devuelve un `anomaly_score`: cuanto mayor sea el valor, más inusual es el registro. La clasificación final se obtiene aplicando el threshold validado y almacenado dentro del modelo de producción.
 
 ## 13. Pruebas automáticas
 
-El proyecto incluye pruebas automatizadas con `pytest` para verificar los datos, el modelo de producción y el funcionamiento de la API.
+El proyecto incluye pruebas automatizadas con `pytest` para verificar los datos, el modelo de producción, la API y las decisiones de monitoreo.
 
 Las pruebas se encuentran organizadas en:
 
@@ -971,8 +1048,10 @@ tests/
 │   └── test_api.py
 ├── data/
 │   └── test_data.py
-└── model/
-    └── test_model.py
+├── model/
+│   └── test_model.py
+└── monitoring/
+    └── test_monitoring.py
 ```
 
 ### 13.1 Pruebas de la API
@@ -1072,7 +1151,23 @@ El feature set utilizado durante la prueba se obtiene directamente desde metadat
 
 El feature set se obtiene desde metadata.json, de modo que la prueba utilice la configuración real de la versión de producción.
 
-### 13.4 Ejecución de las pruebas
+### 13.4 Pruebas de monitoreo
+
+Las pruebas de monitoreo utilizan distribuciones sintéticas controladas y no dependen de los logs productivos. Se comprueba que las métricas detecten cambios reales y eviten decisiones con muestras insuficientes.
+
+| Prueba | Qué verifica |
+|---|---|
+| `test_psi_es_cero_para_distribucion_identica` | PSI cercano a cero cuando producción coincide con referencia |
+| `test_psi_detecta_cambio_de_distribucion` | PSI crítico ante un desplazamiento extremo |
+| `test_js_es_cero_para_distribucion_identica` | Jensen-Shannon cercano a cero para proporciones iguales |
+| `test_js_detecta_cambio_categorico` | Detección de cambio en la mezcla de categorías |
+| `test_system_monitoring_calcula_metricas_y_error` | Latencia, errores, disponibilidad y volumen |
+| `test_data_monitoring_exige_muestra_minima` | No declarar drift con menos de 30 registros |
+| `test_model_monitoring_exige_muestra_minima` | No evaluar el modelo con una muestra insuficiente |
+| `test_model_monitoring_estable_con_referencia` | Estado estable cuando tasa y scores coinciden |
+| `test_reentrenamiento_solo_responde_a_datos_o_modelo` | Una falla operativa no debe reentrenar el modelo |
+
+### 13.5 Ejecución de las pruebas
 
 **Preparación previa**
 
@@ -1106,15 +1201,18 @@ python src/api/export_production_bundle.py
 Una vez disponibles los datos y artefactos necesarios, todas las pruebas pueden ejecutarse desde la raíz del proyecto con:
 
 ```powershell
-pytest tests/ -v
+python -m pytest tests/ -v
 ```
+
+La suite completa contiene 66 pruebas automatizadas.
 
 También pueden ejecutarse por componente:
 
 ```powershell
-pytest tests/data/ -v
-pytest tests/model/ -v
-pytest tests/api/ -v
+python -m pytest tests/data/ -v
+python -m pytest tests/model/ -v
+python -m pytest tests/api/ -v
+python -m pytest tests/monitoring/ -v
 ```
 
 La configuración general de pytest se encuentra en:
@@ -1122,12 +1220,258 @@ La configuración general de pytest se encuentra en:
 ```text
 pytest.ini
 ```
-Ubicado en la carpeta raiz del proyecto. Este archivo permite mantener una configuración común para las pruebas y controlar advertencias conocidas provenientes de dependencias externas.
+
+Ubicado en la carpeta raíz del proyecto. Este archivo permite mantener una configuración común para las pruebas y controlar advertencias conocidas provenientes de dependencias externas.
 
 
 ## 14. Monitoring
 
-Pendiente. Se monitorearán los datos, el modelo y el funcionamiento de la API.
+El proyecto implementa monitoreo en tres dimensiones independientes: sistema, datos y modelo. La API registra automáticamente las solicitudes y predicciones en formato JSON Lines. Posteriormente, un proceso de análisis compara el comportamiento productivo con una referencia construida a partir de los mismos datos, configuración y versión del modelo de producción.
+
+El flujo es:
+
+```text
+FastAPI
+   │
+   ├── requests.jsonl
+   │      └── latencia, endpoint, estado HTTP y volumen
+   │
+   └── predictions.jsonl
+          └── features, prediction y anomaly_score
+                    │
+                    ▼
+        run_monitoring.py
+                    │
+                    ├── métricas
+                    ├── alertas
+                    ├── recomendación
+                    └── monitoring_report.json
+```
+
+Los logs contienen únicamente las variables operativas necesarias para inferencia. No almacenan identificadores como `UID` o `Product ID`.
+
+### 14.1 Perfil de referencia
+
+El perfil de referencia se genera con:
+
+```powershell
+python src/monitoring/build_reference.py
+```
+
+El proceso recupera desde `metadata.json`:
+
+- nombre y versión del modelo;
+- `run_id`;
+- `feature_set`;
+- enfoque de entrenamiento;
+- semilla aleatoria;
+- versión y hash de los datos;
+- threshold validado.
+
+La referencia de datos utiliza las 6.750 observaciones correspondientes al conjunto de entrenamiento reconstruido con `random_state=42`. La referencia del comportamiento del modelo utiliza las 1.500 observaciones de validación.
+
+El resultado se guarda en:
+
+```text
+config/monitoring_reference.json
+```
+
+Los límites operativos y de drift están versionados separadamente en:
+
+```text
+config/monitoring_thresholds.json
+```
+
+### 14.2 Recolección de eventos
+
+La API registra automáticamente:
+
+```text
+logs/monitoring/
+├── requests.jsonl
+└── predictions.jsonl
+```
+
+Cada solicitud contiene:
+
+- timestamp UTC;
+- `request_id`;
+- método y endpoint;
+- estado HTTP;
+- latencia en milisegundos;
+- cantidad de instancias;
+- cantidad de anomalías.
+
+Cada predicción contiene:
+
+- timestamp UTC;
+- modelo y versión;
+- variables originales;
+- clase predicha;
+- `anomaly_score`.
+
+Los logs están excluidos de Git porque representan información dinámica de ejecución.
+
+### 14.3 System Monitoring
+
+Se calculan las siguientes métricas:
+
+| Métrica | Implementación |
+|---|---|
+| Latency | Media y percentil 95 en milisegundos |
+| Throughput | Solicitudes procesadas por minuto |
+| Error Rate | Proporción de respuestas HTTP 4xx y 5xx |
+| Availability | Proporción de respuestas sin errores 5xx |
+| Volume | Solicitudes e instancias procesadas |
+| Endpoint detail | Métricas separadas por endpoint |
+
+Una respuesta `422` incrementa el `Error Rate`, porque representa un request inválido, pero no reduce la disponibilidad: la API estaba activa y respondió correctamente. Los errores `5xx` sí afectan ambas métricas.
+
+### 14.4 Data Monitoring
+
+Se compara la distribución de producción contra la distribución del conjunto de entrenamiento:
+
+```text
+P_reference(X)  vs.  P_production(X)
+```
+
+Se utilizan dos técnicas:
+
+| Tipo de variable | Técnica |
+|---|---|
+| Numéricas | Population Stability Index (PSI) |
+| Categórica `Type` | Jensen-Shannon divergence |
+
+Los límites definidos para PSI son:
+
+| PSI | Estado |
+|---:|---|
+| Menor que 0.10 | Stable |
+| Entre 0.10 y 0.20 | Warning |
+| Mayor o igual que 0.20 | Critical |
+
+Para Jensen-Shannon se utilizan límites de `0.05` para advertencia y `0.10` para estado crítico.
+
+No se declara drift hasta contar con al menos 30 predicciones. Antes de ese límite el resultado es `insufficient_data`.
+
+### 14.5 Model Monitoring
+
+Para el detector LOF se monitorean:
+
+- cantidad de anomalías;
+- tasa de anomalías;
+- diferencia absoluta frente a la tasa de validación;
+- media y desviación estándar del `anomaly_score`;
+- mínimo, mediana, percentil 95 y máximo;
+- desplazamiento de la media del score respecto de validación;
+- nombre y versión exactos del modelo.
+
+LOF no produce una probabilidad calibrada. Por esa razón, el monitoreo utiliza la distribución de `anomaly_score` y la clasificación obtenida con el threshold validado.
+
+La tasa de falsos positivos de referencia se obtiene con las etiquetas de validación. En producción se mantiene el estado `labels_not_available` hasta disponer de ground truth real. No se estima una tasa de falsos positivos sin etiquetas.
+
+### 14.6 Alertas y reentrenamiento
+
+Las métricas se clasifican como:
+
+```text
+stable → warning → critical
+```
+
+El sistema propone evaluar reentrenamiento cuando:
+
+- existe al menos una alerta crítica de datos o modelo; o
+- aparecen dos advertencias simultáneas de datos o modelo.
+
+Una alerta del sistema no activa reentrenamiento, porque problemas de disponibilidad o latencia requieren primero una acción operativa.
+
+El reentrenamiento nunca es automático. La decisión requiere:
+
+1. confirmar que el cambio persiste;
+2. revisar calidad y unidades de los datos;
+3. ejecutar nuevos experimentos en MLflow;
+4. comparar el candidato contra producción;
+5. promover una nueva versión mediante Model Registry.
+
+### 14.7 Ejecutar el monitoreo
+
+En ejecución local:
+
+```powershell
+python src/monitoring/run_monitoring.py
+```
+
+Dentro del contenedor:
+
+```powershell
+docker exec grupo4-mlops-api python src/monitoring/run_monitoring.py
+```
+
+También puede utilizarse otra ventana temporal:
+
+```powershell
+python src/monitoring/run_monitoring.py --window-hours 48
+```
+
+El reporte dinámico se guarda en:
+
+```text
+reports/monitoring/monitoring_report.json
+```
+
+Este archivo está excluido de Git. El repositorio conserva un reporte demostrativo en:
+
+```text
+reports/monitoring/example_drift_report.json
+```
+
+### 14.8 Panel visual
+
+Con el contenedor o la API en ejecución, el panel está disponible en:
+
+```text
+http://127.0.0.1:8000/monitoring
+```
+
+El reporte también puede consultarse como JSON mediante:
+
+```text
+GET /monitoring/report
+```
+
+El panel muestra:
+
+- estado general;
+- métricas del sistema;
+- PSI y Jensen-Shannon por variable;
+- tasa de anomalías;
+- distribución del score;
+- alertas activas;
+- recomendación de reentrenamiento.
+
+### 14.9 Escenario de demostración
+
+El archivo:
+
+```text
+data/processed/api_batch_test.csv
+```
+
+contiene 1.000 registros que pueden cargarse desde la interfaz web. Después de procesarlo se ejecuta:
+
+```powershell
+docker exec grupo4-mlops-api python src/monitoring/run_monitoring.py
+```
+
+En el escenario documentado:
+
+- el sistema permaneció estable;
+- el modelo mantuvo una tasa de anomalías cercana a la referencia;
+- `Air temperature` y `Process temperature` presentaron PSI crítico;
+- se generaron dos alertas;
+- se recomendó evaluar reentrenamiento sin ejecutarlo automáticamente.
+
+Este resultado demuestra que el monitoreo diferencia correctamente un problema de distribución de datos de un fallo del servicio o del modelo.
 
 ## 15. Results
 
@@ -1144,12 +1488,12 @@ El modelo quedó registrado en MLflow Model Registry como:
 ai4i_lof_threshold_tuned
 
 ```
-## 15. Team
+## 16. Team
 
 | Integrante | Participación |
 |---|---|
-| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración y verificación del pipeline, ejecución reproducible de experimentos en MLflow, exportación del modelo de producción, desarrollo de la API con FastAPI, predicción individual y por lotes, interfaz web, contenerización con Docker y documentación de ejecución. |
-| Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, comparación de detectores de anomalías y de ensambles, ajuste de hiperparámetros y thresholds, evaluación los modelos, automatización de MLflow Model Registry, validación final de candidatos y documentación de los experimentos, pruebas automatizadas de datos, modelo y API |
+| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración y verificación del pipeline, ejecución reproducible de experimentos en MLflow, exportación del modelo de producción, desarrollo de la API con FastAPI, predicción individual y por lotes, interfaz web, contenerización con Docker, recolección de eventos, System Monitoring, Data Monitoring, Model Monitoring, alertas, recomendación controlada de reentrenamiento, panel visual de monitoreo, pruebas automatizadas de monitoreo y documentación de ejecución. |
+| Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, comparación de detectores de anomalías y ensambles, ajuste de hiperparámetros y thresholds, evaluación de los modelos, automatización de MLflow Model Registry, validación final de candidatos, documentación de experimentos y pruebas automatizadas de datos, modelo y API. |
 
 Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.
 
