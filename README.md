@@ -213,7 +213,19 @@ Códigos de salida:
 - `1`: alguna regla falla y se bloquea el entrenamiento.
 - `2`: existe un error técnico o de configuración.
 
-## 8. Exploratory data analysis (EDA)
+### 7.3 Pipeline de validación y entrenamiento
+
+Los Data Quality Gates se ejecutan automáticamente antes de iniciar cualquier experimento mediante:
+
+```powershell
+python src/pipeline/run_training.py --experiment 1
+```
+
+El argumento `--experiment` acepta valores del `1` al `6`.
+
+El pipeline genera el dataset raw si todavía no existe, ejecuta las reglas de calidad y solo permite continuar al entrenamiento cuando todas las validaciones son aprobadas. Si alguna regla falla, el entrenamiento se detiene con un código de salida diferente de cero.
+
+### 8. Exploratory data analysis (EDA)
 
 El diagnóstico exploratorio se encuentra en:
 
@@ -757,17 +769,367 @@ Por esta razón, para procesar nuevos registros se debe recuperar desde MLflow a
 
 ## 11. Docker
 
-Pendiente. Aquí se incluirán los comandos para construir y ejecutar el contenedor.
+La API puede ejecutarse dentro de un contenedor Docker sin mantener una conexión activa con el servidor de MLflow.
+
+La imagen utiliza:
+
+- Python 3.13;
+- un usuario sin privilegios;
+- dependencias exclusivas de serving;
+- verificación automática de salud;
+- el modelo y el preprocessor exportados desde el mismo run de MLflow.
+
+### 11.1 Preparar el bundle
+
+Antes de construir la imagen, el servidor de MLflow debe estar activo y el modelo debe tener el alias `production`.
+
+Ejecutar:
+
+```powershell
+python src/api/export_production_bundle.py
+```
+
+El comando genera:
+
+```text
+artifacts/production/
+├── model/
+├── preprocessor.pkl
+└── metadata.json
+```
+
+El exportador normaliza las rutas internas del modelo para que el bundle funcione tanto en Windows como en Linux.
+
+Los artefactos permanecen excluidos de Git. Por esta razón, la exportación debe ejecutarse antes de construir una imagen nueva.
+
+### 11.2 Construir la imagen
+
+Con Docker Desktop activo, ejecutar desde la raíz del proyecto:
+
+```powershell
+docker build -t grupo4-mlops .
+```
+
+### 11.3 Levantar el servicio
+
+```powershell
+docker run -d --name grupo4-mlops-api -p 8000:8000 grupo4-mlops
+```
+
+La API queda disponible en:
+
+```text
+http://127.0.0.1:8000
+```
+
+La documentación interactiva puede abrirse en:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 11.4 Verificar el contenedor
+
+Consultar el estado:
+
+```powershell
+docker ps --filter "name=grupo4-mlops-api"
+```
+
+Probar el endpoint de salud:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health |
+    ConvertTo-Json
+```
+
+La respuesta esperada incluye:
+
+```json
+{
+  "status": "ok",
+  "model_loaded": true,
+  "preprocessor_loaded": true,
+  "model_name": "ai4i_lof_threshold_tuned",
+  "model_version": "1"
+}
+```
+
+Consultar los logs:
+
+```powershell
+docker logs grupo4-mlops-api
+```
+
+Detener el servicio:
+
+```powershell
+docker stop grupo4-mlops-api
+```
+
+Volver a iniciarlo:
+
+```powershell
+docker start grupo4-mlops-api
+```
+
+Eliminar el contenedor detenido:
+
+```powershell
+docker rm grupo4-mlops-api
+```
+
+El contenedor carga el bundle local durante el arranque. Una vez construida la imagen, la inferencia no depende del servidor de MLflow ni de archivos existentes fuera del contenedor.
 
 ## 12. API
 
-Pendiente. La API deberá recibir datos de una máquina y responder si son normales o anómalos.
+La inferencia se expone mediante FastAPI utilizando el modelo LOF registrado con alias `production`.
 
-## 13. Monitoring
+### 12.1 Exportar el bundle de producción
+
+Con el servidor de MLflow activo, ejecutar:
+
+```powershell
+python src/api/export_production_bundle.py
+```
+
+Este comando recupera el modelo PyFunc con alias `production` y el preprocessor almacenado en el mismo `run_id`. Los artefactos se guardan localmente en:
+
+```text
+artifacts/production/
+├── model/
+├── preprocessor.pkl
+└── metadata.json
+```
+
+El bundle está excluido de Git y permite ejecutar la API sin mantener una conexión activa con MLflow. El preprocessor se carga con las transformaciones aprendidas durante entrenamiento; no se vuelve a ajustar con datos nuevos.
+
+### 12.2 Iniciar la API
+
+```powershell
+python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+```
+
+La documentación interactiva queda disponible en:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 12.3 Endpoints
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| GET | `/health` | Verifica que el modelo y el preprocessor estén cargados |
+| POST | `/predict` | Realiza una inferencia individual |
+| POST | `/predict/batch` | Realiza inferencia para un lote de hasta 1000 máquinas |
+
+Ejemplo de entrada:
+
+```json
+{
+  "Type": "L",
+  "Air temperature": 298.9,
+  "Process temperature": 309.1,
+  "Rotational speed": 2861,
+  "Torque": 4.6,
+  "Tool wear": 143
+}
+```
+
+Ejemplo de respuesta:
+
+```json
+{
+  "anomaly": true,
+  "prediction": 1,
+  "anomaly_score": 1.8711027503676605,
+  "model_name": "ai4i_lof_threshold_tuned",
+  "model_version": "1"
+}
+```
+### Interfaz web
+
+La API incluye una interfaz web opcional para facilitar las demostraciones y el consumo del modelo sin escribir solicitudes JSON manualmente.
+
+Con el servicio en ejecución, abrir:
+
+```text
+http://127.0.0.1:8000/ui
+```
+LOF no produce probabilidades calibradas. La API devuelve un `anomaly_score`: cuanto mayor sea el valor, más anómalo es el registro. La clasificación final se obtiene aplicando el umbral validado y almacenado dentro del modelo de producción.
+
+## 13. Pruebas automáticas
+
+El proyecto incluye pruebas automatizadas con `pytest` para verificar los datos, el modelo de producción y el funcionamiento de la API.
+
+Las pruebas se encuentran organizadas en:
+
+```text
+tests/
+├── api/
+│   └── test_api.py
+├── data/
+│   └── test_data.py
+└── model/
+    └── test_model.py
+```
+
+### 13.1 Pruebas de la API
+Las pruebas de la API se realizan directamente en memoria mediante TestClient, por lo que no es necesario levantar Docker para ejecutarlas.
+
+Se comprueba tanto el comportamiento frente a entradas válidas como la respuesta ante diferentes tipos de input inválido.
+
+Estas pruebas permiten demostrar el flujo requerido para un caso válido:
+```text
+Request válido
+      ↓
+HTTP 200
+      ↓
+Response schema válido
+```
+
+También permiten demostrar el comportamiento frente a entradas inválidas: 
+```text
+Input inválido
+      ↓
+Validación de FastAPI/Pydantic
+      ↓
+HTTP 422
+      ↓
+Detalle del campo que produjo el error
+```
+
+Antes de ejecutar las pruebas que requieren inferencia, se consulta el endpoint /health. Si el modelo de producción no está disponible, las pruebas se omiten en lugar de fallar por un problema de configuración del entorno
+
+| Prueba | Qué verifica | Entrada o condición | Resultado esperado |
+|---|---|---|---|
+| verificar_modelo_cargado | Verifica que el modelo de producción esté disponible antes de ejecutar las pruebas que dependen de inferencia. | Modelo y preprocessor cargados correctamente. | Si no están disponibles, las pruebas se omiten mediante pytest.skip en lugar de fallar por un problema de configuración. |
+| test_health_responde_200 | Comprueba que el servicio esté listo para inferencia. | Modelo y preprocessor cargados. | HTTP 200 y status ok. |
+| test_predict_con_input_valido_responde_200 | Verifica una inferencia válida. | Request completo y con valores válidos. | HTTP 200. |
+| test_predict_respeta_el_schema_de_respuesta | Comprueba la estructura de la respuesta. | Request válido. | anomaly, prediction, anomaly_score, model_name y model_version. |
+| test_prediccion_es_valida | Verifica que la salida binaria del detector sea válida. | Request válido. | prediction solo puede tomar los valores 0 o 1. |
+| test_falta_una_variable_obligatoria | Comprueba un request incompleto e identifica el campo faltante. | Se elimina Torque del request. | HTTP 422 y el detalle del error debe indicar Torque. |
+| test_tipo_de_dato_incorrecto | Verifica el rechazo de un tipo de dato incorrecto e identifica el campo afectado. | Se envía texto en Torque. | HTTP 422 y el detalle del error debe indicar Torque. |
+| test_tipo_invalido | Verifica el rechazo de una categoría no permitida e identifica el campo afectado. | Se envía Type = X. | HTTP 422 y el detalle del error debe indicar Type. |
+| test_valor_fuera_de_rango_negativo | Comprueba valores físicamente inválidos. | Rotational speed negativa. | HTTP 422. |
+| test_body_vacio | Verifica un request sin datos. | Body vacío. | HTTP 422. |
+| test_mensaje_de_error_es_informativo | Comprueba que el error identifique el campo problemático. | Rotational speed inválida. | HTTP 422 con detalle del campo. |
+
+### 13.2 Pruebas de datos
+
+Las pruebas de datos se ejecutan sobre data/raw/ai4i2020.csv generado por la ingesta, y comprueban que el dataset mantenga la estructura y las condiciones necesarias antes de ser utilizado por el pipeline.
+
+Estas pruebas cubren integridad estructural, tipos de datos, categorías, valores faltantes, condiciones físicas básicas y consistencia entre variables.
+
+
+| Prueba | Qué verifica | Criterio esperado |
+|---|---|---|
+| test_cantidad_columnas | Comprueba la cantidad de columnas del dataset. | Deben existir exactamente 14 columnas. |
+| test_nombres_y_orden_columnas | Verifica que los nombres y el orden coincidan con el esquema esperado. | La lista de columnas debe coincidir exactamente con COLUMNAS_ESPERADAS. |
+| test_uid_es_entero | Comprueba el tipo de UID. | Debe ser entero. |
+| test_product_id_es_texto | Verifica el tipo de Product ID. | Debe ser texto. |
+| test_type_es_texto | Comprueba el tipo de Type. | Debe ser texto o categórica. |
+| test_variables_operacionales_son_numericas | Verifica las variables operacionales numéricas. | Todas deben tener un tipo numérico. |
+| test_temperaturas_son_flotantes | Comprueba el tipo de las variables de temperatura. | Deben tener tipo flotante. |
+| test_torque_es_flotante | Comprueba el tipo de Torque. | Debe tener tipo flotante. |
+| test_tool_wear_es_entero | Comprueba el tipo de Tool wear. | Debe tener tipo entero. |
+| test_type_contiene_valores_validos | Verifica las categorías permitidas de Type. | Solo se permiten L, M y H. |
+| test_product_id_tiene_formato_valido | Comprueba la estructura de Product ID. | Debe iniciar con L, M o H seguido de números. |
+| test_no_hay_valores_faltantes | Verifica la ausencia de NaN. | No debe existir ningún valor faltante. |
+| test_no_hay_cadenas_vacias | Comprueba las variables de texto. | No deben existir cadenas vacías. |
+| test_no_hay_infinitos | Verifica valores infinitos en variables numéricas. | No deben existir valores infinitos. |
+| test_temperaturas_positivas | Comprueba valores físicamente válidos de temperatura. | Ambas temperaturas deben ser mayores que 0 K. |
+| test_velocidad_rotacion_positiva | Comprueba la velocidad de rotación. | Debe ser mayor que cero. |
+| test_torque_no_negativo | Comprueba el torque. | Debe ser mayor o igual que cero. |
+| test_desgaste_no_negativo | Comprueba el desgaste de herramienta (tool wear). | Debe ser mayor o igual que cero. |
+| test_product_id_coincide_con_type | Verifica coherencia entre Product ID y Type. | La primera letra de Product ID debe coincidir con Type. |
+| test_relacion_entre_temperaturas | Comprueba la relación entre las temperaturas. | Process temperature debe ser mayor que Air temperature. |
+| test_no_hay_filas_duplicadas | Verifica duplicados completos. | No debe existir ninguna fila duplicada. |
+| test_uid_es_unico | Comprueba la unicidad de UID. | Cada UID debe aparecer una sola vez. |
+| test_product_id_es_unico | Comprueba la unicidad de Product ID. | Cada Product ID debe aparecer una sola vez. |
+| test_columnas_binarias | Verifica las variables binarias. | Solo pueden contener 0 y 1. |
+| test_machine_failure_contiene_dos_clases | Comprueba las clases disponibles del objetivo. | Machine failure debe contener 0 y 1. |
+| test_variable_api_obligatoria_presente | Verifica las variables necesarias para inferencia. | Todas las variables requeridas por la API deben existir. |
+
+
+### 13.3 Pruebas del modelo
+
+Las pruebas del modelo verifican que el bundle de producción pueda utilizarse correctamente para realizar inferencias con la misma configuración empleada durante el entrenamiento.
+
+El feature set utilizado durante la prueba se obtiene directamente desde metadata.json, de forma que la prueba utilice la configuración real de la versión de producción y no un valor definido manualmente.
+
+| Prueba | Qué verifica |Entrada o condición| Criterio esperado |
+|---|---|---|---|
+| test_el_modelo_carga_sin_error | Comprueba que el modelo de producción pueda cargarse.| Existe el directorio del modelo dentro del bundle de producción. | El objeto del modelo debe cargarse correctamente. |
+| test_preprocessor_carga_sin_error | Verifica la carga del preprocessor asociado. | Existe preprocessor.pkl dentro del bundle de producción. | El preprocessor debe estar disponible. |
+| test_metadata_contiene_feature_set | Comprueba que la metadata incluya la configuración de variables.| Existe metadata.json y contiene la configuración del modelo exportado. | Debe existir feature_set y ser texto. |
+| test_input_valido_produce_prediccion | Verifica que un input válido llegue hasta inferencia. | Input válido con Type, temperaturas, velocidad, torque y desgaste, procesado con el feature set indicado en metadata. | Debe generarse exactamente una predicción. |
+| test_prediccion_tiene_schema_valido | Comprueba la estructura de salida del modelo.| Input válido procesado. | Debe devolver anomaly_score y prediction. |
+| test_prediccion_es_una_clase_valida | Verifica la clase generada. | Input válido procesado. | Prediction solo puede ser 0 o 1. |
+| test_anomaly_score_es_numerico | Comprueba el tipo del score de anomalía. | Input válido procesado. | El anomaly score debe ser numérico. |
+| test_prediccion_es_determinista | Comprueba reproducibilidad de inferencia. | El mismo input procesado se evalúa dos veces. | Ambas ejecuciones con el mismo input deben producir la misma prediction. |
+
+El feature set se obtiene desde metadata.json, de modo que la prueba utilice la configuración real de la versión de producción.
+
+### 13.4 Ejecución de las pruebas
+
+**Preparación previa**
+
+Antes de ejecutar las pruebas, deben existir los artefactos necesarios para cada componente.
+
+Para las pruebas de datos debe existir el dataset original en:
+```text
+data/raw/ai4i2020.csv
+```
+
+Si todavía no existe, puede generarse mediante:
+```powershell
+python src/ingestion/ingest.py
+```
+
+Para las pruebas del modelo y de la API debe existir el bundle de producción:
+```text
+artifacts/production/
+├── model/
+├── preprocessor.pkl
+└── metadata.json
+```
+
+Si todavía no existe, debe generarse con MLflow en ejecución:
+```powershell
+python src/api/export_production_bundle.py
+```
+
+**Ejecución de las pruebas**
+
+Una vez disponibles los datos y artefactos necesarios, todas las pruebas pueden ejecutarse desde la raíz del proyecto con:
+
+```powershell
+pytest tests/ -v
+```
+
+También pueden ejecutarse por componente:
+
+```powershell
+pytest tests/data/ -v
+pytest tests/model/ -v
+pytest tests/api/ -v
+```
+
+La configuración general de pytest se encuentra en:
+
+```text
+pytest.ini
+```
+Ubicado en la carpeta raiz del proyecto. Este archivo permite mantener una configuración común para las pruebas y controlar advertencias conocidas provenientes de dependencias externas.
+
+
+## 14. Monitoring
 
 Pendiente. Se monitorearán los datos, el modelo y el funcionamiento de la API.
 
-## 14. Results
+## 15. Results
 
 El modelo seleccionado para producción fue **LOF**, utilizando el conjunto de características `engineered_only` y el enfoque `semi_supervised`.
 
@@ -786,8 +1148,8 @@ ai4i_lof_threshold_tuned
 
 | Integrante | Participación |
 |---|---|
-| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración de cambios, verificación del pipeline y ejecución reproducible de los experimentos en MLflow. |
-| Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, ajuste de hiperparámetros y thresholds, automatización del Model Registry y documentación de los experimentos. |
+| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración y verificación del pipeline, ejecución reproducible de experimentos en MLflow, exportación del modelo de producción, desarrollo de la API con FastAPI, predicción individual y por lotes, interfaz web, contenerización con Docker y documentación de ejecución. |
+| Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, comparación de detectores de anomalías y de ensambles, ajuste de hiperparámetros y thresholds, evaluación los modelos, automatización de MLflow Model Registry, validación final de candidatos y documentación de los experimentos, pruebas automatizadas de datos, modelo y API |
 
 Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.
 
