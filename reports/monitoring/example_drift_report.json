@@ -1,0 +1,156 @@
+{
+  "generated_at_utc": "2026-08-30T21:27:51.280515+00:00",
+  "window_hours": 24.0,
+  "model": {
+    "name": "ai4i_lof_threshold_tuned",
+    "version": "1",
+    "run_id": "f50a245b07ac428da321aab2397c5174",
+    "feature_set": "engineered_only",
+    "approach": "semi_supervised",
+    "random_seed": 42,
+    "data_version": "ai4i2020_v1",
+    "data_hash": "9724b2eb4479a21bf4c3266bcc68ac60a96de4453a5642dc8f4304362728c966",
+    "threshold": -0.09562740779615853
+  },
+  "overall_status": "critical",
+  "system_monitoring": {
+    "status": "stable",
+    "request_count": 2,
+    "processed_instances": 1000,
+    "error_count": 0,
+    "error_rate": 0.0,
+    "availability": 1.0,
+    "latency_mean_ms": 82.53750000000001,
+    "latency_p95_ms": 155.56035,
+    "throughput_requests_per_minute": 2.0,
+    "endpoints": {
+      "/health": {
+        "request_count": 1,
+        "error_rate": 0.0,
+        "latency_mean_ms": 1.401,
+        "latency_p95_ms": 1.401
+      },
+      "/predict/batch": {
+        "request_count": 1,
+        "error_rate": 0.0,
+        "latency_mean_ms": 163.674,
+        "latency_p95_ms": 163.674
+      }
+    }
+  },
+  "data_monitoring": {
+    "status": "critical",
+    "production_rows": 1000,
+    "reference_rows": 6750,
+    "numeric_drift": {
+      "Air temperature": {
+        "status": "critical",
+        "psi": 7.683634686979179,
+        "missing_rate": 0.0,
+        "production_mean": 297.5004,
+        "reference_mean": 299.98005925925924
+      },
+      "Process temperature": {
+        "status": "critical",
+        "psi": 5.348834229622115,
+        "missing_rate": 0.0,
+        "production_mean": 308.3449,
+        "reference_mean": 309.9955111111111
+      },
+      "Rotational speed": {
+        "status": "stable",
+        "psi": 0.005575721127745664,
+        "missing_rate": 0.0,
+        "production_mean": 1539.511,
+        "reference_mean": 1540.7195555555556
+      },
+      "Torque": {
+        "status": "stable",
+        "psi": 0.005117102774495785,
+        "missing_rate": 0.0,
+        "production_mean": 39.8159,
+        "reference_mean": 39.60346666666666
+      },
+      "Tool wear": {
+        "status": "stable",
+        "psi": 0.00512796079406272,
+        "missing_rate": 0.0,
+        "production_mean": 109.262,
+        "reference_mean": 105.85037037037037
+      }
+    },
+    "categorical_drift": {
+      "Type": {
+        "status": "stable",
+        "js_divergence": 0.000349995966252503,
+        "production_proportions": {
+          "H": 0.114,
+          "L": 0.601,
+          "M": 0.285
+        },
+        "reference_proportions": {
+          "H": 0.10251851851851852,
+          "L": 0.5918518518518519,
+          "M": 0.30562962962962964
+        }
+      }
+    }
+  },
+  "model_monitoring": {
+    "status": "stable",
+    "production_rows": 1000,
+    "anomaly_count": 110,
+    "normal_count": 890,
+    "anomaly_rate": 0.11,
+    "reference_anomaly_rate": 0.09,
+    "anomaly_rate_absolute_difference": 0.020000000000000004,
+    "score_distribution": {
+      "mean": -0.22142348749988583,
+      "standard_deviation": 0.16720578404347933,
+      "minimum": -0.3488535192019776,
+      "median": -0.26300593246834114,
+      "p95": 0.00021941139550100283,
+      "maximum": 2.0551344771923254,
+      "reference_mean": -0.2343039313008029,
+      "mean_shift_standard_deviations": 0.08707501325114202
+    },
+    "false_positive_monitoring": {
+      "reference_false_positive_rate": 0.06639004149377593,
+      "production_false_positive_rate": null,
+      "status": "labels_not_available",
+      "message": "La tasa de falsos positivos en producción se calculará cuando existan etiquetas reales."
+    }
+  },
+  "alerts": [
+    {
+      "category": "data",
+      "metric": "Air temperature.psi",
+      "severity": "critical",
+      "value": 7.683634686979179,
+      "threshold": 0.2,
+      "message": "Se detectó cambio en la distribución de Air temperature.",
+      "recommended_action": "Validar la fuente, unidades y condiciones operativas antes de reentrenar."
+    },
+    {
+      "category": "data",
+      "metric": "Process temperature.psi",
+      "severity": "critical",
+      "value": 5.348834229622115,
+      "threshold": 0.2,
+      "message": "Se detectó cambio en la distribución de Process temperature.",
+      "recommended_action": "Validar la fuente, unidades y condiciones operativas antes de reentrenar."
+    }
+  ],
+  "alert_count": 2,
+  "retraining_recommendation": {
+    "recommended": true,
+    "decision": "evaluate_retraining",
+    "reasons": [
+      "Se detectó cambio en la distribución de Air temperature.",
+      "Se detectó cambio en la distribución de Process temperature."
+    ],
+    "policy": "Se propone evaluar reentrenamiento cuando existe al menos una alerta crítica de datos/modelo o dos advertencias simultáneas.",
+    "automatic_retraining": false,
+    "note": "El reentrenamiento requiere validación humana, comparación en MLflow y promoción controlada."
+  }
+}

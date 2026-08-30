@@ -4,6 +4,8 @@ import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from time import perf_counter
+from uuid import uuid4
 
 import joblib
 import mlflow
@@ -22,6 +24,10 @@ from src.api.schemas import (
 from src.feature_engineering.preprocessing import (
     preparar_nuevos_datos,
 )
+from src.monitoring.collector import (
+    registrar_predicciones,
+    registrar_solicitud,
+)
 
 
 RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
@@ -36,6 +42,23 @@ DIRECTORIO_STATIC = (
 RUTA_INTERFAZ = (
     DIRECTORIO_STATIC
     / "index.html"
+)
+
+RUTA_INTERFAZ_MONITOREO = (
+    DIRECTORIO_STATIC
+    / "monitoring.html"
+)
+
+RUTA_REPORTE_MONITOREO = Path(
+    os.getenv(
+        "MONITORING_REPORT_PATH",
+        str(
+            RAIZ_PROYECTO
+            / "reports"
+            / "monitoring"
+            / "monitoring_report.json"
+        ),
+    )
 )
 
 DIRECTORIO_BUNDLE = Path(
@@ -63,6 +86,12 @@ RUTA_METADATA = (
     DIRECTORIO_BUNDLE
     / "metadata.json"
 )
+
+ENDPOINTS_MONITOREADOS = {
+    "/health",
+    "/predict",
+    "/predict/batch",
+}
 
 
 def cargar_bundle():
@@ -159,6 +188,52 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.middleware("http")
+async def monitorear_solicitud(
+    request: Request,
+    call_next,
+):
+    """Registra disponibilidad, errores y latencia de la API."""
+
+    if request.url.path not in ENDPOINTS_MONITOREADOS:
+        return await call_next(request)
+
+    request_id = uuid4().hex
+    request.state.request_id = request_id
+
+    inicio = perf_counter()
+    status_code = 500
+
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+
+    finally:
+        latency_ms = (
+            perf_counter() - inicio
+        ) * 1000
+
+        registrar_solicitud(
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            status_code=status_code,
+            latency_ms=latency_ms,
+            instance_count=getattr(
+                request.state,
+                "instance_count",
+                None,
+            ),
+            anomaly_count=getattr(
+                request.state,
+                "anomaly_count",
+                None,
+            ),
+        )
+
+
 app.mount(
     "/static",
     StaticFiles(
@@ -166,6 +241,7 @@ app.mount(
     ),
     name="static",
 )
+
 
 def generar_predicciones(
     request,
@@ -220,7 +296,43 @@ def generar_predicciones(
                 )
             )
 
+        total_anomalias = sum(
+            prediccion.prediction
+            for prediccion in predicciones
+        )
+
+        request.state.instance_count = len(
+            predicciones
+        )
+
+        request.state.anomaly_count = int(
+            total_anomalias
+        )
+
+        request_id = getattr(
+            request.state,
+            "request_id",
+            None,
+        )
+
+        if request_id is None:
+            request_id = uuid4().hex
+            request.state.request_id = request_id
+
+        registrar_predicciones(
+            request_id=request_id,
+            endpoint=request.url.path,
+            entradas=datos.to_dict(
+                orient="records"
+            ),
+            predicciones=predicciones,
+            metadata=metadata,
+        )
+
         return predicciones
+
+    except HTTPException:
+        raise
 
     except Exception as error:
         raise HTTPException(
@@ -230,6 +342,7 @@ def generar_predicciones(
                 f"{error}"
             ),
         ) from error
+
 
 @app.get(
     "/ui",
@@ -242,6 +355,54 @@ def interfaz_web():
         RUTA_INTERFAZ
     )
 
+
+@app.get(
+    "/monitoring",
+    include_in_schema=False,
+)
+def interfaz_monitoreo():
+    """Muestra el panel visual de monitoreo."""
+
+    return FileResponse(
+        RUTA_INTERFAZ_MONITOREO
+    )
+
+
+@app.get(
+    "/monitoring/report",
+    tags=["Monitoring"],
+)
+def obtener_reporte_monitoreo():
+    """Devuelve el último reporte de monitoreo generado."""
+
+    if not RUTA_REPORTE_MONITOREO.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "El reporte de monitoreo todavía no existe. "
+                "Ejecute: python "
+                "src/monitoring/run_monitoring.py"
+            ),
+        )
+
+    try:
+        with RUTA_REPORTE_MONITOREO.open(
+            encoding="utf-8"
+        ) as archivo:
+            return json.load(
+                archivo
+            )
+
+    except json.JSONDecodeError as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "El reporte de monitoreo no contiene "
+                "un JSON válido."
+            ),
+        ) from error
+
+
 @app.get(
     "/",
     tags=["General"],
@@ -252,6 +413,7 @@ def root():
     return {
         "service": "AI4I Anomaly Detection API",
         "interface": "/ui",
+        "monitoring": "/monitoring",
         "documentation": "/docs",
         "health": "/health",
     }
@@ -289,6 +451,7 @@ def health(request: Request):
             metadata["model_version"]
         ),
     )
+
 
 @app.post(
     "/predict",

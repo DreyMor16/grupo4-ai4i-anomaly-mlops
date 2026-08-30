@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+    <meta
+        name="description"
+        content="Panel de monitoreo del modelo AI4I en producción."
+    >
+    <title>Monitoreo | AI4I</title>
+    <link
+        rel="stylesheet"
+        href="/static/monitoring.css"
+    >
+    <script
+        src="/static/monitoring.js"
+        defer
+    ></script>
+</head>
+
+<body>
+    <a
+        class="skip-link"
+        href="#contenido"
+    >
+        Ir al contenido
+    </a>
+
+    <header class="topbar">
+        <div class="topbar-content">
+            <a
+                class="brand"
+                href="/ui"
+                aria-label="Ir a la inferencia AI4I"
+            >
+                <span class="brand-mark">A4</span>
+
+                <span>
+                    <strong>AI4I Monitor</strong>
+                    <small>MLOps · Grupo 4</small>
+                </span>
+            </a>
+
+            <nav aria-label="Navegación principal">
+                <a href="/ui">
+                    Inferencia
+                </a>
+
+                <a
+                    href="/docs"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    Swagger
+                </a>
+
+                <button
+                    id="refresh-button"
+                    class="refresh-button"
+                    type="button"
+                >
+                    Actualizar
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main
+        id="contenido"
+        class="container"
+    >
+        <section class="page-heading">
+            <div>
+                <p class="eyebrow">
+                    Monitoreo de producción
+                </p>
+
+                <h1>
+                    Estado operativo del modelo
+                </h1>
+
+                <p class="page-description">
+                    Comparación del comportamiento productivo
+                    contra la referencia validada.
+                </p>
+            </div>
+
+            <div class="heading-status">
+                <span class="status-label">
+                    Estado general
+                </span>
+
+                <span
+                    id="overall-status"
+                    class="status-badge neutral"
+                >
+                    Cargando
+                </span>
+
+                <small id="generated-at">
+                    Consultando el reporte…
+                </small>
+            </div>
+        </section>
+
+        <section
+            id="error-panel"
+            class="message error-message"
+            hidden
+            role="alert"
+        >
+            <strong>
+                No fue posible cargar el monitoreo.
+            </strong>
+
+            <span id="error-message">
+                Ejecuta primero el reporte de monitoreo.
+            </span>
+        </section>
+
+        <section
+            id="loading-panel"
+            class="message"
+            aria-live="polite"
+        >
+            Cargando métricas…
+        </section>
+
+        <div
+            id="dashboard"
+            hidden
+        >
+            <section class="model-strip">
+                <div>
+                    <span>Modelo</span>
+                    <strong id="model-name">—</strong>
+                </div>
+
+                <div>
+                    <span>Versión</span>
+                    <strong id="model-version">—</strong>
+                </div>
+
+                <div>
+                    <span>Ventana analizada</span>
+                    <strong id="window-hours">—</strong>
+                </div>
+
+                <div>
+                    <span>Predicciones</span>
+                    <strong id="production-rows">—</strong>
+                </div>
+            </section>
+
+            <section
+                class="section"
+                aria-labelledby="system-title"
+            >
+                <div class="section-heading">
+                    <div>
+                        <p class="section-index">
+                            O1
+                        </p>
+
+                        <h2 id="system-title">
+                            System Monitoring
+                        </h2>
+                    </div>
+
+                    <span
+                        id="system-status"
+                        class="status-badge neutral"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="metrics-grid">
+                    <article class="metric">
+                        <span>Latencia p95</span>
+                        <strong id="latency-p95">—</strong>
+                        <small>milisegundos</small>
+                    </article>
+
+                    <article class="metric">
+                        <span>Throughput</span>
+                        <strong id="throughput">—</strong>
+                        <small>solicitudes/minuto</small>
+                    </article>
+
+                    <article class="metric">
+                        <span>Error rate</span>
+                        <strong id="error-rate">—</strong>
+                        <small>respuestas 4xx y 5xx</small>
+                    </article>
+
+                    <article class="metric">
+                        <span>Disponibilidad</span>
+                        <strong id="availability">—</strong>
+                        <small>respuestas sin error 5xx</small>
+                    </article>
+                </div>
+
+                <p
+                    id="system-summary"
+                    class="section-note"
+                >
+                    —
+                </p>
+            </section>
+
+            <div class="content-grid">
+                <section
+                    class="section"
+                    aria-labelledby="data-title"
+                >
+                    <div class="section-heading">
+                        <div>
+                            <p class="section-index">
+                                O2
+                            </p>
+
+                            <h2 id="data-title">
+                                Data Monitoring
+                            </h2>
+                        </div>
+
+                        <span
+                            id="data-status"
+                            class="status-badge neutral"
+                        >
+                            —
+                        </span>
+                    </div>
+
+                    <p class="section-description">
+                        Distribución de producción comparada con
+                        el conjunto de entrenamiento.
+                    </p>
+
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th scope="col">
+                                        Variable
+                                    </th>
+                                    <th scope="col">
+                                        Técnica
+                                    </th>
+                                    <th scope="col">
+                                        Valor
+                                    </th>
+                                    <th scope="col">
+                                        Estado
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="drift-table-body">
+                                <tr>
+                                    <td colspan="4">
+                                        Sin datos.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p
+                        id="data-summary"
+                        class="section-note"
+                    >
+                        —
+                    </p>
+                </section>
+
+                <section
+                    class="section"
+                    aria-labelledby="model-title"
+                >
+                    <div class="section-heading">
+                        <div>
+                            <p class="section-index">
+                                O3
+                            </p>
+
+                            <h2 id="model-title">
+                                Model Monitoring
+                            </h2>
+                        </div>
+
+                        <span
+                            id="model-status"
+                            class="status-badge neutral"
+                        >
+                            —
+                        </span>
+                    </div>
+
+                    <div class="comparison">
+                        <div>
+                            <span>
+                                Anomaly rate actual
+                            </span>
+                            <strong id="anomaly-rate">
+                                —
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>
+                                Referencia
+                            </span>
+                            <strong id="reference-anomaly-rate">
+                                —
+                            </strong>
+                        </div>
+                    </div>
+
+                    <h3>
+                        Distribución del anomaly score
+                    </h3>
+
+                    <dl class="score-list">
+                        <div>
+                            <dt>Media actual</dt>
+                            <dd id="score-mean">—</dd>
+                        </div>
+
+                        <div>
+                            <dt>Media de referencia</dt>
+                            <dd id="reference-score-mean">—</dd>
+                        </div>
+
+                        <div>
+                            <dt>Mediana</dt>
+                            <dd id="score-median">—</dd>
+                        </div>
+
+                        <div>
+                            <dt>Percentil 95</dt>
+                            <dd id="score-p95">—</dd>
+                        </div>
+
+                        <div>
+                            <dt>Mínimo</dt>
+                            <dd id="score-minimum">—</dd>
+                        </div>
+
+                        <div>
+                            <dt>Máximo</dt>
+                            <dd id="score-maximum">—</dd>
+                        </div>
+                    </dl>
+
+                    <p
+                        id="false-positive-note"
+                        class="section-note"
+                    >
+                        —
+                    </p>
+                </section>
+            </div>
+
+            <section
+                class="section"
+                aria-labelledby="alerts-title"
+            >
+                <div class="section-heading">
+                    <div>
+                        <p class="section-index">
+                            Alertas
+                        </p>
+
+                        <h2 id="alerts-title">
+                            Hallazgos que requieren atención
+                        </h2>
+                    </div>
+
+                    <span
+                        id="alert-count"
+                        class="count-badge"
+                    >
+                        0
+                    </span>
+                </div>
+
+                <div
+                    id="alerts-list"
+                    class="alerts-list"
+                >
+                    <p class="empty-state">
+                        No hay alertas activas.
+                    </p>
+                </div>
+            </section>
+
+            <section
+                id="decision-panel"
+                class="decision"
+                aria-labelledby="decision-title"
+            >
+                <div>
+                    <p class="section-index">
+                        Decisión controlada
+                    </p>
+
+                    <h2 id="decision-title">
+                        Recomendación de reentrenamiento
+                    </h2>
+
+                    <p id="decision-message">
+                        —
+                    </p>
+                </div>
+
+                <span
+                    id="decision-badge"
+                    class="decision-badge"
+                >
+                    —
+                </span>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container footer-content">
+            <span>
+                AI4I 2020 · Detector LOF · Grupo 4
+            </span>
+
+            <span>
+                El reentrenamiento siempre requiere
+                validación humana y comparación en MLflow.
+            </span>
+        </div>
+    </footer>
+</body>
+</html>
