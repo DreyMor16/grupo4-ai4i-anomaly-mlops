@@ -131,11 +131,20 @@ def cargar_bundle():
 async def lifespan(app):
     """Carga los artefactos una sola vez al iniciar la API."""
 
-    (
-        app.state.modelo,
-        app.state.preprocessor,
-        app.state.metadata,
-    ) = cargar_bundle()
+    try:
+        (
+            app.state.modelo,
+            app.state.preprocessor,
+            app.state.metadata,
+        ) = cargar_bundle()
+
+        app.state.load_error = None
+
+    except Exception as error:
+        app.state.modelo = None
+        app.state.preprocessor = None
+        app.state.metadata = None
+        app.state.load_error = str(error)
 
     yield
 
@@ -256,26 +265,30 @@ def root():
 def health(request: Request):
     """Confirma que el servicio y sus artefactos están cargados."""
 
-    metadata = (
-        request.app.state.metadata
-    )
+    if (
+        request.app.state.modelo is None
+        or request.app.state.preprocessor is None
+        or request.app.state.metadata is None
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Modelo no disponible: "
+                f"{request.app.state.load_error}"
+            ),
+        )
+
+    metadata = request.app.state.metadata
 
     return HealthResponse(
         status="ok",
-        model_loaded=(
-            request.app.state.modelo
-            is not None
-        ),
-        preprocessor_loaded=(
-            request.app.state.preprocessor
-            is not None
-        ),
+        model_loaded=True,
+        preprocessor_loaded=True,
         model_name=metadata["model_name"],
         model_version=str(
             metadata["model_version"]
         ),
     )
-
 
 @app.post(
     "/predict",
