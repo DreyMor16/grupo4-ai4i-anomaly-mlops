@@ -10,7 +10,13 @@ La idea es analizar las condiciones de funcionamiento de una máquina y detectar
 - Completado: **EDA, feature engineering y preprocesamiento**.
 - Completado: **Experimentos 1–6 y ajuste de thresholds**.
 - Completado: **Registro y validación final de candidatos con MLflow Model Registry**.
-- Próxima etapa: **Docker**.
+- Completado: **API de inferencia y predicción por lotes**.
+- Completado: **Contenerización con Docker**.
+- Completado: **Pruebas automatizadas de datos, modelo, API y monitoreo**.
+- Completado: **Monitoreo de sistema, datos y modelo**.
+- Completado: **Simulación de drift en producción**.
+- Completado: **Simulación de problemas de calidad sobre un batch de producción**.
+- Próxima etapa: **Definir e implementar la estrategia de reentrenamiento**.
 
 El flujo Git utilizado es:
 
@@ -1864,7 +1870,114 @@ Antes de tomar una decisión se debe:
 
 De esta forma, el sistema diferencia entre detectar drift, recomendar una investigación y ejecutar una decisión sobre el modelo.
 
-## 16. Results
+## 16. Simulación de problemas de calidad
+
+Para comprobar el comportamiento del Data Quality Gate frente a problemas que no necesariamente aparecen en el dataset original, se implementó una simulación controlada de contaminación sobre un batch de producción.
+
+La simulación se encuentra en:
+
+```text
+src/validation/simulate_quality_issues.py
+```
+
+El script toma una muestra reproducible del dataset original, crea una un batch a partir del dataset original y agrega intencionalmente diferentes problemas de calidad. El archivo original `data/raw/ai4i2020.csv` no se modifica.
+
+La configuración utilizada para esta prueba se encuentra en:
+
+```text
+config/data_quality_production.json
+```
+
+Esta configuración mantiene las reglas de calidad del proyecto, pero utiliza una cantidad mínima de 30 registros para permitir la validación de batches de producción pequeños.
+
+### 16.1 Problemas simulados
+
+El batch contaminado incorpora los problemas solicitados para la prueba del pipeline:
+
+| Problema | Simulación realizada |
+|---|---|
+| Missing value | Se asigna un valor faltante en Torque |
+| Duplicated row | Se agrega una copia de una fila existente |
+| Extreme outlier | Se asigna Torque = -500000 |
+| Incorrect datatype | Se asigna Rotational speed = "rapido" |
+| Unknown category | Se asigna Type = "X" |
+| Schema modification | Se elimina Process temperature |
+
+El batch generado se guarda en:
+
+```text
+data/processed/quality_simulation/contaminated_batch.csv
+```
+
+### 16.2 Flujo de validación
+
+La simulación reutiliza el Data Quality Gate implementado en:
+
+```text
+src/validation/validate.py
+```
+
+El flujo evaluado es:
+
+```text
+Dataset original
+      ↓
+Muestra reproducible
+      ↓
+Copia del batch
+      ↓
+Contaminación controlada
+      ↓
+Data Quality Gate
+      ↓
+Detecta
+      ↓
+Bloquea
+      ↓
+Registra
+```
+
+El objetivo de la prueba es comprobar que un batch con problemas de calidad no continúe normalmente por el pipeline.
+
+Cuando alguna regla falla, el Data Quality Gate devuelve código de salida `1`, indicando que el batch queda bloqueado. El código `0` representa una validación aprobada y el código `2` un error técnico o de configuración.
+
+### 16.3 Evidencias generadas
+
+La simulación genera un reporte completo en formato JSON:
+
+```text
+reports/validation/simulated_quality_contamination_report.json
+```
+
+También genera un resumen tabular en formato CSV:
+
+```text
+reports/validation/simulated_quality_contamination_summary.csv
+```
+
+El reporte registra el resultado de cada regla, incluyendo:
+
+- nombre de la validación;
+- estado aprobado o fallido;
+- valor observado;
+- criterio esperado;
+- detalle del resultado.
+
+De esta forma se conserva evidencia del incidente detectado durante la prueba.
+
+### 16.4 Ejecución
+
+Desde la raíz del proyecto ejecutar:
+
+```powershell
+python src/validation/simulate_quality_issues.py
+```
+
+La ejecución esperada debe finalizar indicando que los problemas fueron detectados y que el batch contaminado quedó bloqueado.
+
+La contaminación constituye únicamente una prueba controlada del pipeline. El dataset original se conserva sin modificaciones permanentes.
+
+## 17. Results
 
 El modelo seleccionado para producción fue **LOF**, utilizando el conjunto de características `engineered_only` y el enfoque `semi_supervised`.
 
@@ -1879,7 +1992,7 @@ El modelo quedó registrado en MLflow Model Registry como:
 ai4i_lof_threshold_tuned
 
 ```
-## 17. Team
+## 18. Team
 
 | Integrante | Participación |
 |---|---|

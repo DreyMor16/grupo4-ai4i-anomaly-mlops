@@ -1,0 +1,13 @@
+nombre,aprobada,valor_observado,criterio_esperado,detalle
+filas_minimas,True,1001,>= 30,Se encontraron 1001 filas; se requieren al menos 30.
+esquema_columnas,False,13,14,Faltantes: ['Process temperature']; adicionales: ninguna.
+tasa_valores_faltantes,False,0.000077,<= 0.000000,Se encontraron 1 valores faltantes en 13013 celdas.
+marcadores_de_faltantes,True,Ninguno,0 marcadores,Marcadores encontrados: ninguno.
+tasa_filas_duplicadas,False,0.000999,<= 0.000000,Se encontraron 1 filas completamente duplicadas.
+tipos_numericos,False,No numéricas: ['Rotational speed'],Todas las columnas deben ser numéricas,Ausentes: ['Process temperature']; tipos incorrectos: ['Rotational speed'].
+categorias_permitidas,False,{'Type': ['X']},Solo categorías configuradas,Problemas encontrados: {'Type': ['X']}.
+dominio_columnas_binarias,True,Solo valores 0 y 1,"{0, 1}",Problemas encontrados: ninguno.
+identificadores_unicos,False,"{'UID': 1, 'Product ID': 1}",0 duplicados por identificador,"Duplicados: {'UID': 1, 'Product ID': 1}; ausentes: ninguna."
+rangos_fisicos,False,"{'Process temperature': 'Columna ausente', 'Rotational speed': 'Tipo no numérico', 'Torque': '1 valores negativos'}",0 valores físicamente imposibles,"Problemas encontrados: {'Process temperature': 'Columna ausente', 'Rotational speed': 'Tipo no numérico', 'Torque': '1 valores negativos'}."
+clases_variable_objetivo,True,"[0, 1]","[0, 1]","Clases observadas: [0, 1]."
+consistencia_etiquetas_falla,True,0.002997,<= 0.003000,Inconsistencias: 3; columnas ausentes: ninguna.
