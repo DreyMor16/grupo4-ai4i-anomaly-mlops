@@ -1,0 +1,4 @@
+batch,rows,variable,shift_standard_deviations,shift_original_units,psi,expected_status,detected_status
+production_batch_1,1000,Air temperature,0.0,0.0,0.0052458689947274045,stable,stable
+production_batch_2,1000,Air temperature,0.25438596491228066,0.5075302923608024,0.12200420794457059,warning,warning
+production_batch_3,1000,Air temperature,0.4040100250626566,0.8060481096409985,0.30035991680762075,critical,critical
