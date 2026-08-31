@@ -1473,7 +1473,382 @@ En el escenario documentado:
 
 Este resultado demuestra que el monitoreo diferencia correctamente un problema de distribución de datos de un fallo del servicio o del modelo.
 
-## 15. Results
+## 15. Simulación de producción y drift
+
+Se implementó una simulación reproducible para demostrar que el sistema puede detectar cambios progresivos en la distribución de los datos de producción.
+
+La simulación representa conceptualmente el siguiente flujo:
+
+```text
+REFERENCE
+    ↓
+PRODUCTION BATCH 1
+    ↓
+PRODUCTION BATCH 2
+    ↓
+PRODUCTION BATCH 3
+```
+
+Cada Production Batch se compara directamente contra la misma distribución de referencia:
+
+```text
+P_reference(X) vs P_production_batch_1(X)
+P_reference(X) vs P_production_batch_2(X)
+P_reference(X) vs P_production_batch_3(X)
+```
+
+El Batch 3 no se compara contra el Batch 2. Todos los lotes se evalúan independientemente contra la referencia validada.
+
+Para cuantificar el cambio se utiliza Population Stability Index (PSI), empleando los mismos bins y proporciones calculados durante la creación del perfil de referencia del monitoreo.
+
+### 15.1 Reference
+
+La referencia contiene 6.750 registros procedentes del conjunto de entrenamiento utilizado por el modelo de producción.
+
+Debido a que el modelo utiliza un enfoque semisupervisado, la referencia corresponde a los registros normales seleccionados para el entrenamiento.
+
+Esta referencia representa el comportamiento operativo esperado y se utiliza para calcular:
+
+- distribución de cada variable numérica;
+- media;
+- desviación estándar;
+- valores mínimos y máximos;
+- bordes de los bins;
+- proporción esperada dentro de cada bin.
+
+El perfil se encuentra en:
+
+```text
+config/monitoring_reference.json
+```
+
+Características de la referencia:
+
+| Propiedad | Valor |
+|---|---|
+| Fuente | Training split |
+| Registros | 6.750 |
+| Enfoque | Semisupervisado |
+| Semilla aleatoria | 42 |
+| Modelo | ai4i_lof_threshold_tuned |
+| Versión del modelo | 1 |
+
+### 15.2 Production Batch 1 — Operación estable
+
+El primer lote contiene 1.000 registros seleccionados aleatoriamente desde la referencia, sin aplicar ninguna modificación.
+
+La selección utiliza la semilla `42`, por lo que los resultados pueden reproducirse.
+
+Su objetivo es comprobar que una muestra procedente de la misma población de referencia no genere una falsa alerta de drift.
+
+| Propiedad | Valor |
+|---|---|
+| Registros | 1.000 |
+| Variable modificada | Ninguna |
+| Cambio aplicado | 0,0000 K |
+| Cambio en desviaciones estándar | 0,0000 |
+| PSI obtenido | 0,0052 |
+| Estado esperado | Stable |
+| Estado detectado | Stable |
+
+Interpretación:
+
+```text
+PSI = 0,0052 < 0,10 → STABLE
+```
+
+El pequeño valor de PSI se debe a las diferencias naturales entre la muestra de 1.000 registros y la referencia completa de 6.750 registros.
+
+### 15.3 Production Batch 2 — Drift moderado
+
+El segundo lote parte exactamente de los mismos 1.000 registros utilizados en el Batch 1.
+
+La única modificación consiste en aumentar la variable `Air temperature` en aproximadamente `0,5075 K`.
+
+Este cambio equivale a aproximadamente `0,2544` desviaciones estándar de la distribución de referencia.
+
+Su objetivo es representar una variación moderada que debe vigilarse, pero que todavía no constituye una condición crítica.
+
+| Propiedad | Valor |
+|---|---|
+| Registros | 1.000 |
+| Variable modificada | Air temperature |
+| Cambio aplicado | +0,5075 K |
+| Cambio en desviaciones estándar | +0,2544 |
+| PSI obtenido | 0,1220 |
+| Estado esperado | Warning |
+| Estado detectado | Warning |
+
+Interpretación:
+
+```text
+0,10 ≤ PSI = 0,1220 < 0,20 → WARNING
+```
+
+Las demás variables permanecen sin modificación para aislar el efecto del cambio en `Air temperature`.
+
+### 15.4 Production Batch 3 — Drift crítico
+
+El tercer lote también parte de los mismos 1.000 registros originales del Batch 1.
+
+En este escenario, `Air temperature` aumenta aproximadamente `0,8060 K`.
+
+Este cambio equivale a aproximadamente `0,4040` desviaciones estándar de la distribución de referencia.
+
+Su objetivo es representar una modificación suficientemente fuerte para activar una alerta crítica.
+
+| Propiedad | Valor |
+|---|---|
+| Registros | 1.000 |
+| Variable modificada | Air temperature |
+| Cambio aplicado | +0,8060 K |
+| Cambio en desviaciones estándar | +0,4040 |
+| PSI obtenido | 0,3004 |
+| Estado esperado | Critical |
+| Estado detectado | Critical |
+
+Interpretación:
+
+```text
+PSI = 0,3004 ≥ 0,20 → CRITICAL
+```
+
+Este resultado demuestra que el sistema reconoce un cambio importante en la distribución productiva.
+
+### 15.5 Justificación del diseño de los batches
+
+Los tres lotes utilizan la misma muestra base de 1.000 registros.
+
+Esta decisión permite que la única diferencia controlada sea el desplazamiento aplicado sobre `Air temperature`. De esta forma, el aumento del PSI puede atribuirse al cambio en esa variable y no a diferencias aleatorias entre muestras distintas.
+
+Se seleccionaron 1.000 registros porque:
+
+- superan ampliamente el mínimo de 30 requerido por el monitoreo;
+- permiten estimar una distribución productiva estable;
+- mantienen un costo computacional bajo;
+- coinciden con el límite operativo utilizado por la API para el procesamiento por lotes;
+- facilitan la comparación entre los tres escenarios.
+
+Se seleccionó `Air temperature` porque:
+
+- es una variable numérica continua;
+- representa una condición operativa relevante de la maquinaria;
+- forma parte de las entradas originales de la API;
+- cuenta con un perfil de referencia validado;
+- permite demostrar claramente un cambio en `P(X)` mediante PSI.
+
+Las demás variables permanecen constantes para evitar confundir el origen del drift.
+
+Los desplazamientos son generados de forma controlada por el simulador. El programa busca de manera reproducible un cambio capaz de producir:
+
+- un PSI dentro del nivel `warning`;
+- un PSI dentro del nivel `critical`.
+
+Esta búsqueda forma parte de una simulación controlada y no pretende representar una predicción de cambios futuros reales.
+
+### 15.6 Resultados de la simulación
+
+Los resultados obtenidos fueron:
+
+| Lote | Registros | Cambio en Air temperature | PSI | Estado esperado | Estado detectado |
+|---|---:|---:|---:|---|---|
+| Production Batch 1 | 1.000 | 0,0000 K | 0,0052 | Stable | Stable |
+| Production Batch 2 | 1.000 | +0,5075 K | 0,1220 | Warning | Warning |
+| Production Batch 3 | 1.000 | +0,8060 K | 0,3004 | Critical | Critical |
+
+La progresión detectada fue:
+
+```text
+PSI 0,0052 → STABLE
+PSI 0,1220 → WARNING
+PSI 0,3004 → CRITICAL
+```
+
+Los tres estados detectados coinciden con los estados esperados.
+
+### 15.7 Thresholds utilizados
+
+Los límites configurados para PSI son:
+
+| Rango de PSI | Estado | Interpretación operativa |
+|---|---|---|
+| PSI < 0,10 | Stable | No existe evidencia relevante de drift |
+| 0,10 ≤ PSI < 0,20 | Warning | Existe un cambio moderado que debe vigilarse |
+| PSI ≥ 0,20 | Critical | Existe un cambio importante que requiere investigación |
+
+Estos thresholds se encuentran en:
+
+```text
+config/monitoring_thresholds.json
+```
+
+Los thresholds se utilizan como criterios operativos para esta demostración. No se consideran leyes universales.
+
+Su interpretación depende de factores como:
+
+- dominio del problema;
+- tamaño de la muestra;
+- cantidad y construcción de los bins;
+- frecuencia con la que se ejecuta el monitoreo;
+- variabilidad natural del proceso;
+- impacto operativo de las decisiones;
+- tolerancia al riesgo de la organización.
+
+En un sistema real, estos límites deberán revisarse utilizando historial productivo, conocimiento experto del proceso industrial y evidencia obtenida durante la operación.
+
+### 15.8 Ejecutar la simulación
+
+La simulación se implementó en:
+
+```text
+src/monitoring/simulate_drift.py
+```
+
+Para ejecutarla desde la raíz del proyecto:
+
+```bash
+python src/monitoring/simulate_drift.py
+```
+
+El programa realiza las siguientes operaciones:
+
+1. carga la metadata del modelo de producción;
+2. carga el perfil de referencia;
+3. carga los thresholds de monitoreo;
+4. reconstruye la misma partición utilizada como referencia;
+5. selecciona una muestra reproducible de 1.000 registros;
+6. genera tres Production Batches;
+7. aplica desplazamientos progresivos sobre `Air temperature`;
+8. calcula PSI utilizando los bins de referencia;
+9. asigna los estados `stable`, `warning` y `critical`;
+10. verifica que los resultados coincidan con los escenarios esperados;
+11. genera las evidencias JSON y CSV.
+
+Una ejecución correcta finaliza con:
+
+```text
+[PASS] Los tres niveles de drift fueron detectados correctamente.
+```
+
+### 15.9 Archivos generados
+
+Los lotes productivos simulados se generan localmente en:
+
+```text
+data/processed/drift_simulation/
+```
+
+Este directorio contiene:
+
+```text
+production_batch_1.csv
+production_batch_2.csv
+production_batch_3.csv
+```
+
+Estos archivos son reproducibles y no se almacenan en Git porque pertenecen a los datos procesados generados durante la ejecución.
+
+Las evidencias de la simulación se almacenan en:
+
+```text
+reports/monitoring/drift_simulation_report.json
+reports/monitoring/drift_simulation_summary.csv
+```
+
+El reporte JSON contiene:
+
+- configuración de la simulación;
+- fuente y tamaño de la referencia;
+- variable modificada;
+- semilla utilizada;
+- thresholds;
+- justificación de los thresholds;
+- desplazamiento aplicado en cada lote;
+- métricas de todas las variables;
+- estado esperado;
+- estado detectado;
+- validación de coincidencia.
+
+El archivo CSV contiene un resumen tabular de los tres lotes y facilita su revisión durante la demostración.
+
+### 15.10 Pruebas automatizadas
+
+Las pruebas de la simulación se encuentran en:
+
+```text
+tests/monitoring/test_drift_simulation.py
+```
+
+Las pruebas verifican que:
+
+- el desplazamiento no modifique el lote original;
+- un lote sin drift sea clasificado como estable;
+- el simulador pueda generar un PSI de advertencia;
+- el simulador pueda generar un PSI crítico;
+- el PSI aumente progresivamente con el desplazamiento.
+
+Para ejecutar únicamente estas pruebas:
+
+```bash
+python -m pytest tests/monitoring/test_drift_simulation.py -v
+```
+
+Resultado validado:
+
+```text
+5 passed
+```
+
+Para ejecutar la suite completa del proyecto:
+
+```bash
+python -m pytest -q
+```
+
+Resultado validado:
+
+```text
+71 passed
+```
+
+### 15.11 Interpretación y respuesta operativa
+
+La simulación demuestra que el sistema puede comparar:
+
+```text
+P_reference(X)
+```
+
+contra:
+
+```text
+P_production(X)
+```
+
+y cuantificar el cambio mediante PSI.
+
+El comportamiento observado es consistente:
+
+- el lote representativo permanece estable;
+- el cambio moderado genera una advertencia;
+- el cambio fuerte genera una alerta crítica.
+
+Una alerta crítica de drift indica que el cambio debe investigarse. No demuestra automáticamente que el modelo esté incorrecto y no activa un reentrenamiento automático.
+
+Antes de tomar una decisión se debe:
+
+1. validar la fuente de los datos;
+2. confirmar que las unidades sean correctas;
+3. revisar posibles errores de instrumentación;
+4. determinar si existe una nueva condición operativa real;
+5. analizar el comportamiento del modelo;
+6. comparar candidatos en MLflow;
+7. realizar validación humana;
+8. promover una nueva versión únicamente mediante un proceso controlado.
+
+De esta forma, el sistema diferencia entre detectar drift, recomendar una investigación y ejecutar una decisión sobre el modelo.
+
+## 16. Results
 
 El modelo seleccionado para producción fue **LOF**, utilizando el conjunto de características `engineered_only` y el enfoque `semi_supervised`.
 
@@ -1488,11 +1863,12 @@ El modelo quedó registrado en MLflow Model Registry como:
 ai4i_lof_threshold_tuned
 
 ```
-## 16. Team
+## 17. Team
 
 | Integrante | Participación |
 |---|---|
-| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración y verificación del pipeline, ejecución reproducible de experimentos en MLflow, exportación del modelo de producción, desarrollo de la API con FastAPI, predicción individual y por lotes, interfaz web, contenerización con Docker, recolección de eventos, System Monitoring, Data Monitoring, Model Monitoring, alertas, recomendación controlada de reentrenamiento, panel visual de monitoreo, pruebas automatizadas de monitoreo y documentación de ejecución. |
+| Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración y verificación del pipeline, ejecución reproducible de experimentos en MLflow, exportación del modelo de producción, desarrollo de la API con FastAPI, predicción individual y por lotes, interfaz web, contenerización con Docker, recolección de eventos, System Monitoring, Data Monitoring, Model Monitoring, alertas, recomendación controlada de reentrenamiento, panel visual de monitoreo, simulación reproducible de producción y drift, generación de Production Batches, detección progresiva mediante PSI, justificación de thresholds, generación de evidencias, pruebas automatizadas de monitoreo y drift, y documentación de ejecución. |
+
 | Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, comparación de detectores de anomalías y ensambles, ajuste de hiperparámetros y thresholds, evaluación de los modelos, automatización de MLflow Model Registry, validación final de candidatos, documentación de experimentos y pruebas automatizadas de datos, modelo y API. |
 
 Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.

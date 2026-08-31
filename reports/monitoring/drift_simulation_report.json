@@ -1,0 +1,160 @@
+{
+  "generated_at_utc": "2026-08-31T00:06:53.767526+00:00",
+  "simulation": {
+    "objective": "Demostrar la detección de un cambio progresivo en P(X).",
+    "reference_source": "training_split",
+    "reference_rows": 6750,
+    "production_batch_rows": 1000,
+    "variable_modified": "Air temperature",
+    "random_seed": 42
+  },
+  "thresholds": {
+    "psi_stable": "PSI < 0.1",
+    "psi_warning": "0.1 <= PSI < 0.2",
+    "psi_critical": "PSI >= 0.2",
+    "justification": "Son umbrales operativos orientativos para esta simulación. No constituyen leyes universales: su interpretación depende del dominio, tamaño de muestra y estrategia de discretización."
+  },
+  "batches": {
+    "production_batch_1": {
+      "description": "Sin desplazamiento artificial.",
+      "file": "data\\processed\\drift_simulation\\production_batch_1.csv",
+      "expected_status": "stable",
+      "detected_status": "stable",
+      "status_matches_expected": true,
+      "shift_standard_deviations": 0.0,
+      "shift_original_units": 0.0,
+      "metrics": {
+        "row_count": 1000,
+        "status": "stable",
+        "numeric_drift": {
+          "Air temperature": {
+            "technique": "PSI",
+            "value": 0.0052458689947274045,
+            "status": "stable"
+          },
+          "Process temperature": {
+            "technique": "PSI",
+            "value": 0.009680154448973315,
+            "status": "stable"
+          },
+          "Rotational speed": {
+            "technique": "PSI",
+            "value": 0.010896933255276922,
+            "status": "stable"
+          },
+          "Torque": {
+            "technique": "PSI",
+            "value": 0.00764861871669783,
+            "status": "stable"
+          },
+          "Tool wear": {
+            "technique": "PSI",
+            "value": 0.014067001034435452,
+            "status": "stable"
+          }
+        },
+        "categorical_drift": {
+          "Type": {
+            "technique": "Jensen-Shannon",
+            "value": 0.0001112289898941095,
+            "status": "stable"
+          }
+        }
+      }
+    },
+    "production_batch_2": {
+      "description": "Desplazamiento moderado controlado.",
+      "file": "data\\processed\\drift_simulation\\production_batch_2.csv",
+      "expected_status": "warning",
+      "detected_status": "warning",
+      "status_matches_expected": true,
+      "shift_standard_deviations": 0.25438596491228066,
+      "shift_original_units": 0.5075302923608024,
+      "metrics": {
+        "row_count": 1000,
+        "status": "warning",
+        "numeric_drift": {
+          "Air temperature": {
+            "technique": "PSI",
+            "value": 0.12200420794457059,
+            "status": "warning"
+          },
+          "Process temperature": {
+            "technique": "PSI",
+            "value": 0.009680154448973315,
+            "status": "stable"
+          },
+          "Rotational speed": {
+            "technique": "PSI",
+            "value": 0.010896933255276922,
+            "status": "stable"
+          },
+          "Torque": {
+            "technique": "PSI",
+            "value": 0.00764861871669783,
+            "status": "stable"
+          },
+          "Tool wear": {
+            "technique": "PSI",
+            "value": 0.014067001034435452,
+            "status": "stable"
+          }
+        },
+        "categorical_drift": {
+          "Type": {
+            "technique": "Jensen-Shannon",
+            "value": 0.0001112289898941095,
+            "status": "stable"
+          }
+        }
+      }
+    },
+    "production_batch_3": {
+      "description": "Desplazamiento fuerte controlado.",
+      "file": "data\\processed\\drift_simulation\\production_batch_3.csv",
+      "expected_status": "critical",
+      "detected_status": "critical",
+      "status_matches_expected": true,
+      "shift_standard_deviations": 0.4040100250626566,
+      "shift_original_units": 0.8060481096409985,
+      "metrics": {
+        "row_count": 1000,
+        "status": "critical",
+        "numeric_drift": {
+          "Air temperature": {
+            "technique": "PSI",
+            "value": 0.30035991680762075,
+            "status": "critical"
+          },
+          "Process temperature": {
+            "technique": "PSI",
+            "value": 0.009680154448973315,
+            "status": "stable"
+          },
+          "Rotational speed": {
+            "technique": "PSI",
+            "value": 0.010896933255276922,
+            "status": "stable"
+          },
+          "Torque": {
+            "technique": "PSI",
+            "value": 0.00764861871669783,
+            "status": "stable"
+          },
+          "Tool wear": {
+            "technique": "PSI",
+            "value": 0.014067001034435452,
+            "status": "stable"
+          }
+        },
+        "categorical_drift": {
+          "Type": {
+            "technique": "Jensen-Shannon",
+            "value": 0.0001112289898941095,
+            "status": "stable"
+          }
+        }
+      }
+    }
+  }
+}
