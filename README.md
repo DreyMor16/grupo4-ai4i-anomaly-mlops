@@ -1395,6 +1395,22 @@ El reentrenamiento nunca es automático. La decisión requiere:
 
 ### 14.7 Ejecutar el monitoreo
 
+### 14.7 Ejecutar el monitoreo
+
+#### Justificación de la ventana de monitoreo
+
+El monitoreo operativo utiliza una ventana móvil de 24 horas. En cada ejecución se analizan los eventos registrados entre el momento actual y las 24 horas anteriores.
+
+Esta ventana fue seleccionada porque representa un ciclo diario de operación, permite acumular suficientes observaciones y reduce la sensibilidad frente a fluctuaciones de corta duración.
+
+La elección busca equilibrar dos objetivos:
+
+- detectar cambios con suficiente rapidez;
+- evitar alertas causadas por muestras pequeñas o ruido temporal.
+
+La simulación de drift se evalúa de manera diferente: cada Production Batch se compara independientemente contra la referencia, evitando mezclar los tres escenarios simulados dentro de una misma ventana temporal.
+
+
 En ejecución local:
 
 ```powershell
