@@ -40,7 +40,7 @@ RUTA_BATCH = (
 RUTA_CONFIG = (
     RAIZ_PROYECTO
     / "config"
-    / "data_quality_production".json"
+    / "data_quality_production.json"
 )
 
 RUTA_REPORTE_JSON = (
@@ -107,6 +107,14 @@ def contaminar_batch(
     ] = -500000
 
     # Incorrect datatype
+    contaminado[
+        "Rotational speed"
+    ] = contaminado[
+        "Rotational speed"
+    ].astype(
+        object
+    )
+
     contaminado.loc[
         2,
         "Rotational speed",

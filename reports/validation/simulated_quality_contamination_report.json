@@ -1,5 +1,5 @@
 {
-  "fecha_ejecucion_utc": "2026-08-31T23:13:20.114958+00:00",
+  "fecha_ejecucion_utc": "2026-09-01T00:43:13.500424+00:00",
   "dataset": "data/processed/quality_simulation/contaminated_batch.csv",
   "estado_general": "FAIL",
   "reglas_totales": 12,
@@ -9,9 +9,9 @@
     {
       "nombre": "filas_minimas",
       "aprobada": true,
-      "valor_observado": "1001",
+      "valor_observado": "501",
       "criterio_esperado": ">= 30",
-      "detalle": "Se encontraron 1001 filas; se requieren al menos 30."
+      "detalle": "Se encontraron 501 filas; se requieren al menos 30."
     },
     {
       "nombre": "esquema_columnas",
@@ -23,9 +23,9 @@
     {
       "nombre": "tasa_valores_faltantes",
       "aprobada": false,
-      "valor_observado": "0.000077",
+      "valor_observado": "0.000154",
       "criterio_esperado": "<= 0.000000",
-      "detalle": "Se encontraron 1 valores faltantes en 13013 celdas."
+      "detalle": "Se encontraron 1 valores faltantes en 6513 celdas."
     },
     {
       "nombre": "marcadores_de_faltantes",
@@ -37,7 +37,7 @@
     {
       "nombre": "tasa_filas_duplicadas",
       "aprobada": false,
-      "valor_observado": "0.000999",
+      "valor_observado": "0.001996",
       "criterio_esperado": "<= 0.000000",
       "detalle": "Se encontraron 1 filas completamente duplicadas."
     },
@@ -86,9 +86,9 @@
     {
       "nombre": "consistencia_etiquetas_falla",
       "aprobada": true,
-      "valor_observado": "0.002997",
+      "valor_observado": "0.001996",
       "criterio_esperado": "<= 0.003000",
-      "detalle": "Inconsistencias: 3; columnas ausentes: ninguna."
+      "detalle": "Inconsistencias: 1; columnas ausentes: ninguna."
     }
   ]
 }
