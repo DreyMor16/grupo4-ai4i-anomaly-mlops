@@ -20,5 +20,10 @@
     "anomaly_rate_difference_critical": 0.05,
     "score_mean_shift_warning": 1,
     "score_mean_shift_critical": 2
+  },
+  "retraining": {
+    "performance_metric": "recall",
+    "reference_performance": 0.6792,
+    "maximum_relative_drop": 0.10
   }
 }

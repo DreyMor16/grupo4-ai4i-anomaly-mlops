@@ -16,7 +16,7 @@ La idea es analizar las condiciones de funcionamiento de una máquina y detectar
 - Completado: **Monitoreo de sistema, datos y modelo**.
 - Completado: **Simulación de drift en producción**.
 - Completado: **Simulación de problemas de calidad sobre un batch de producción**.
-- Próxima etapa: **Definir e implementar la estrategia de reentrenamiento**.
+- Completado: **Estrategia controlada de reentrenamiento basada en drift y degradación del desempeño**.
 
 El flujo Git utilizado es:
 
@@ -1171,7 +1171,10 @@ Las pruebas de monitoreo utilizan distribuciones sintéticas controladas y no de
 | `test_data_monitoring_exige_muestra_minima` | No declarar drift con menos de 30 registros |
 | `test_model_monitoring_exige_muestra_minima` | No evaluar el modelo con una muestra insuficiente |
 | `test_model_monitoring_estable_con_referencia` | Estado estable cuando tasa y scores coinciden |
-| `test_reentrenamiento_solo_responde_a_datos_o_modelo` | Una falla operativa no debe reentrenar el modelo |
+| `test_reentrenamiento_continua_sin_drift_critico` | Sin drift crítico se continúa monitoreando |
+| `test_reentrenamiento_investiga_drift_sin_ground_truth` | Drift crítico sin etiquetas reales requiere investigación, no reentrenamiento |
+| `test_reentrenamiento_no_se_recomienda_si_performance_se_mantiene` | Drift crítico con Recall aceptable no recomienda reentrenamiento |
+| `test_reentrenamiento_se_evalua_si_drift_y_performance_degradado` | Drift crítico y Recall por debajo del límite recomiendan evaluar reentrenamiento |
 
 ### 13.5 Ejecución de las pruebas
 
@@ -1210,7 +1213,7 @@ Una vez disponibles los datos y artefactos necesarios, todas las pruebas pueden 
 python -m pytest tests/ -v
 ```
 
-La suite completa contiene 66 pruebas automatizadas.
+La suite completa contiene 74 pruebas automatizadas.
 
 También pueden ejecutarse por componente:
 
@@ -1378,28 +1381,59 @@ La tasa de falsos positivos de referencia se obtiene con las etiquetas de valida
 
 ### 14.6 Alertas y reentrenamiento
 
-Las métricas se clasifican como:
+El nivel de drift detectado se clasifica en tres estados:
 
 ```text
 stable → warning → critical
 ```
 
-El sistema propone evaluar reentrenamiento cuando:
+- stable: no se detecta un cambio relevante en la distribución de los datos.
+- warning: se detecta un cambio moderado que debe mantenerse bajo observación.
+- critical: se detecta un cambio importante en la distribución de los datos y debe investigarse.
 
-- existe al menos una alerta crítica de datos o modelo; o
-- aparecen dos advertencias simultáneas de datos o modelo.
+La detección de drift no implica automáticamente degradación del modelo. Un cambio en la distribución de los datos puede deberse a una nueva condición operativa, cambios reales del proceso, instrumentación o problemas de calidad, por lo que el sistema no recomienda reentrenamiento únicamente porque exista drift.
 
-Una alerta del sistema no activa reentrenamiento, porque problemas de disponibilidad o latencia requieren primero una acción operativa.
+La estrategia utiliza Recall como métrica de desempeño cuando existe ground truth disponible. Como referencia se utiliza el Recall obtenido por el modelo LOF final en test. Se considera una posible degradación cuando el Recall disminuye un 10% o más con respecto a este valor de referencia:
 
-El reentrenamiento nunca es automático. La decisión requiere:
+La configuración utilizada es:
 
-1. confirmar que el cambio persiste;
-2. revisar calidad y unidades de los datos;
-3. ejecutar nuevos experimentos en MLflow;
-4. comparar el candidato contra producción;
-5. promover una nueva versión mediante Model Registry.
+```text
+performance_metric = recall
+reference_performance = 0.6792
+maximum_relative_drop = 0.10
+```
+Esta configuración se encuentra  en `config/monitoring_thresholds.json`.
 
-### 14.7 Ejecutar el monitoreo
+A partir del Recall de referencia y de la caída relativa máxima permitida, se calcula el `performance_threshold`, que funciona como límite para determinar si el desempeño del modelo ha disminuido de forma significativa.
+
+```text
+performance_threshold
+= reference_performance × (1 - maximum_relative_drop)
+= 0.6792 × (1 - 0.10)
+= 0.61128
+```
+
+La lógica implementada es:
+
+```text
+Sin drift crítico
+→ continue_monitoring
+
+Drift crítico + sin ground truth
+→ investigate_drift
+
+Drift crítico + caída del Recall menor al 10% (Recall > performance_threshold)
+→ continue_monitoring
+
+Drift crítico + caída del Recall igual o mayor al 10% (Recall <= performance_threshold)
+→ evaluate_retraining
+```
+
+Cuando todavía no existen etiquetas reales en producción, el sistema no calcula el desempeño ni asume degradación. En ese caso, un drift crítico genera una recomendación de investigación y no de reentrenamiento.
+
+El reentrenamiento nunca es automático. Incluso cuando se cumple la condición de drift crítico y una caída del Recall igual o superior al 10%, la salida es únicamente evaluate_retraining. La decisión requiere revisar la causa del cambio, generar nuevos experimentos en MLflow, comparar candidatos contra el modelo de producción y promover una nueva versión mediante Model Registry.
+
+
 
 ### 14.7 Ejecutar el monitoreo
 
@@ -1490,8 +1524,9 @@ En el escenario documentado:
 - el sistema permaneció estable;
 - el modelo mantuvo una tasa de anomalías cercana a la referencia;
 - `Air temperature` y `Process temperature` presentaron PSI crítico;
-- se generaron dos alertas;
-- se recomendó evaluar reentrenamiento sin ejecutarlo automáticamente.
+- se generaron alertas de drift;
+- al no existir ground truth productivo, la recomendación fue investigar el drift;
+- no se recomendó reentrenamiento automático.
 
 Este resultado demuestra que el monitoreo diferencia correctamente un problema de distribución de datos de un fallo del servicio o del modelo.
 
@@ -1830,7 +1865,7 @@ python -m pytest -q
 Resultado validado:
 
 ```text
-71 passed
+74 passed
 ```
 
 ### 15.11 Interpretación y respuesta operativa
@@ -1880,7 +1915,7 @@ La simulación se encuentra en:
 src/validation/simulate_quality_issues.py
 ```
 
-El script toma una muestra reproducible del dataset original, crea una un batch a partir del dataset original y agrega intencionalmente diferentes problemas de calidad. El archivo original `data/raw/ai4i2020.csv` no se modifica.
+El script toma una muestra reproducible del dataset original, crea una batch a partir del dataset original y agrega intencionalmente diferentes problemas de calidad. El archivo original `data/raw/ai4i2020.csv` no se modifica.
 
 La configuración utilizada para esta prueba se encuentra en:
 
@@ -1998,7 +2033,7 @@ ai4i_lof_threshold_tuned
 |---|---|
 | Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración y verificación del pipeline, ejecución reproducible de experimentos en MLflow, exportación del modelo de producción, desarrollo de la API con FastAPI, predicción individual y por lotes, interfaz web, contenerización con Docker, recolección de eventos, System Monitoring, Data Monitoring, Model Monitoring, alertas, recomendación controlada de reentrenamiento, panel visual de monitoreo, simulación reproducible de producción y drift, generación de Production Batches, detección progresiva mediante PSI, justificación de thresholds, generación de evidencias, pruebas automatizadas de monitoreo y drift, y documentación de ejecución. |
 
-| Dayana | Análisis exploratorio de datos, ingeniería de características, pipeline de preprocesamiento, modelado, comparación de detectores de anomalías y ensambles, ajuste de hiperparámetros y thresholds, evaluación de los modelos, automatización de MLflow Model Registry, validación final de candidatos, documentación de experimentos y pruebas automatizadas de datos, modelo y API. |
+| Dayana | Análisis exploratorio de datos, definición y validación de decisiones de limpieza y preprocesamiento, ingeniería de características, diseño del pipeline de preprocesamiento, definición de los enfoques unsupervised y semi-supervised, selección y comparación de feature sets, implementación y comparación de detectores de anomalías, ajuste de hiperparámetros y thresholds, análisis de métricas y selección de criterios de evaluación, comparación de LOF, One-Class SVM y ensambles, evaluación de modelos sobre validation y test, selección y justificación del modelo final de producción, registro y automatización del flujo de MLflow Model Registry, validación y promoción de candidatos, pruebas automatizadas de datos, modelo, API y lógica de reentrenamiento, definición de la estrategia de reentrenamiento basada en drift y degradación del Recall, actualización de la documentación técnica |
 
 Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.
 

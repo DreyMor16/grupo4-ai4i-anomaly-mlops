@@ -1093,59 +1093,128 @@ def calcular_metricas_modelo(
 
 
 def crear_recomendacion(
-    alertas: list[dict[str, Any]],
+    data_status,
+    current_performance,
+    configuracion,
 ) -> dict:
-    """Decide si hay evidencia suficiente para proponer reentrenamiento."""
+    """Decide si existen condiciones suficientes para evaluar reentrenamiento."""
 
-    alertas_modelo_datos = [
-        alerta
-        for alerta in alertas
-        if alerta["category"] in {
-            "data",
-            "model",
-        }
+    performance_metric = configuracion[
+        "performance_metric"
     ]
 
-    criticas = [
-        alerta
-        for alerta in alertas_modelo_datos
-        if alerta["severity"] == "critical"
-    ]
-
-    advertencias = [
-        alerta
-        for alerta in alertas_modelo_datos
-        if alerta["severity"] == "warning"
-    ]
-
-    recomendado = bool(
-        criticas
-        or len(
-            advertencias
-        ) >= 2
+    reference_performance = float(
+        configuracion[
+            "reference_performance"
+        ]
     )
 
-    razones = [
-        alerta["message"]
-        for alerta in (
-            criticas
-            if criticas
-            else advertencias
+    maximum_relative_drop = float(
+        configuracion[
+            "maximum_relative_drop"
+        ]
+    )
+
+    performance_threshold = (
+        reference_performance
+        * (
+            1
+            - maximum_relative_drop
         )
-    ]
+    )
+
+    if data_status != "critical":
+        return {
+            "recommended": False,
+            "decision": "continue_monitoring",
+            "reasons": [
+                "No se detectó drift crítico."
+            ],
+            "performance_metric": performance_metric,
+            "reference_performance": reference_performance,
+            "current_performance": current_performance,
+            "performance_threshold": performance_threshold,
+            "policy": (
+                "El drift por sí solo no implica degradación del modelo. "
+                "Se propone evaluar reentrenamiento únicamente cuando "
+                "existe drift crítico y degradación confirmada del desempeño."
+            ),
+            "automatic_retraining": False,
+            "note": (
+                "El reentrenamiento requiere validación humana, "
+                "comparación en MLflow y promoción controlada."
+            ),
+        }
+
+    if current_performance is None:
+        return {
+            "recommended": False,
+            "decision": "investigate_drift",
+            "reasons": [
+                (
+                    "Existe drift crítico, pero todavía no hay "
+                    "ground truth para confirmar degradación."
+                )
+            ],
+            "performance_metric": performance_metric,
+            "reference_performance": reference_performance,
+            "current_performance": None,
+            "performance_threshold": performance_threshold,
+            "policy": (
+                "El drift por sí solo no implica degradación del modelo. "
+                "Se propone evaluar reentrenamiento únicamente cuando "
+                "existe drift crítico y degradación confirmada del desempeño."
+            ),
+            "automatic_retraining": False,
+            "note": (
+                "El reentrenamiento requiere validación humana, "
+                "comparación en MLflow y promoción controlada."
+            ),
+        }
+
+    if current_performance <= performance_threshold:
+        return {
+            "recommended": True,
+            "decision": "evaluate_retraining",
+            "reasons": [
+                (
+                    "Existe drift crítico y degradación confirmada "
+                    "del desempeño."
+                )
+            ],
+            "performance_metric": performance_metric,
+            "reference_performance": reference_performance,
+            "current_performance": current_performance,
+            "performance_threshold": performance_threshold,
+            "policy": (
+                "El drift por sí solo no implica degradación del modelo. "
+                "Se propone evaluar reentrenamiento únicamente cuando "
+                "existe drift crítico y degradación confirmada del desempeño."
+            ),
+            "automatic_retraining": False,
+            "note": (
+                "El reentrenamiento requiere validación humana, "
+                "comparación en MLflow y promoción controlada."
+            ),
+        }
 
     return {
-        "recommended": recomendado,
-        "decision": (
-            "evaluate_retraining"
-            if recomendado
-            else "continue_monitoring"
-        ),
-        "reasons": razones,
+        "recommended": False,
+        "decision": "continue_monitoring",
+        "reasons": [
+            (
+                "Existe drift crítico, pero el desempeño del modelo "
+                "se mantiene dentro del límite definido."
+            )
+        ],
+        "performance_metric": performance_metric,
+        "reference_performance": reference_performance,
+        "current_performance": current_performance,
+        "performance_threshold": performance_threshold,
         "policy": (
-            "Se propone evaluar reentrenamiento cuando existe "
-            "al menos una alerta crítica de datos/modelo o dos "
-            "advertencias simultáneas."
+            "El drift por sí solo no implica degradación del modelo. "
+            "Se propone evaluar reentrenamiento únicamente cuando "
+            "existe drift crítico y degradación confirmada del desempeño."
         ),
         "automatic_retraining": False,
         "note": (
@@ -1249,7 +1318,11 @@ def main() -> None:
     )
 
     recomendacion = crear_recomendacion(
-        alertas
+        data_status=datos["status"],
+        current_performance=None,
+        configuracion=configuracion[
+            "retraining"
+        ],
     )
 
     reporte = {
