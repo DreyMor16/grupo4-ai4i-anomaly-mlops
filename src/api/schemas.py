@@ -11,6 +11,7 @@ class MachineInput(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
         extra="forbid",
+        allow_inf_nan=False,
     )
 
     type: Literal["L", "M", "H"] = Field(
