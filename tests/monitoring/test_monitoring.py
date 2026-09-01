@@ -1,5 +1,8 @@
 """Pruebas para las métricas y decisiones de monitoreo."""
 
+import json
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -12,6 +15,26 @@ from src.monitoring.run_monitoring import (
     crear_recomendacion,
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+RUTA_CONFIG = (
+    PROJECT_ROOT
+    / "config"
+    / "monitoring_thresholds.json"
+)
+
+
+with RUTA_CONFIG.open(
+    encoding="utf-8"
+) as archivo:
+    CONFIGURACION = json.load(
+        archivo
+    )
+
+
+RETRAINING_CONFIG = CONFIGURACION[
+    "retraining"
+]
 
 PERFIL_NUMERICO = {
     "bin_edges": [
@@ -306,34 +329,99 @@ def test_model_monitoring_estable_con_referencia():
     assert alertas == []
 
 
-def test_reentrenamiento_solo_responde_a_datos_o_modelo():
-    """Una alerta operativa no debe reentrenar el modelo."""
+def test_reentrenamiento_continua_sin_drift_critico():
+    """Sin drift crítico no se debe proponer reentrenamiento."""
 
-    alerta_sistema = {
-        "category": "system",
-        "severity": "critical",
-        "message": "API no disponible.",
-    }
+    resultado = crear_recomendacion(
+        data_status="stable",
+        current_performance=None,
+        configuracion=RETRAINING_CONFIG,
+    )
 
-    decision_sistema = crear_recomendacion(
-        [
-            alerta_sistema,
+    assert resultado["recommended"] is False
+    assert resultado["decision"] == "continue_monitoring"
+    assert resultado["automatic_retraining"] is False
+
+
+def test_reentrenamiento_investiga_drift_sin_ground_truth():
+    """El drift crítico no basta para recomendar reentrenamiento."""
+
+    resultado = crear_recomendacion(
+        data_status="critical",
+        current_performance=None,
+        configuracion=RETRAINING_CONFIG,
+    )
+
+    assert resultado["recommended"] is False
+    assert resultado["decision"] == "investigate_drift"
+    assert resultado["current_performance"] is None
+    assert resultado["automatic_retraining"] is False
+
+
+def test_reentrenamiento_no_se_recomienda_si_performance_se_mantiene():
+    """Con drift crítico pero Recall aceptable se continúa monitoreando."""
+
+    reference_performance = float(
+        RETRAINING_CONFIG[
+            "reference_performance"
         ]
     )
 
-    assert decision_sistema["recommended"] is False
-
-    alerta_drift = {
-        "category": "data",
-        "severity": "critical",
-        "message": "Drift crítico detectado.",
-    }
-
-    decision_drift = crear_recomendacion(
-        [
-            alerta_drift,
+    maximum_relative_drop = float(
+        RETRAINING_CONFIG[
+            "maximum_relative_drop"
         ]
     )
 
-    assert decision_drift["recommended"] is True
-    assert decision_drift["automatic_retraining"] is False
+    performance_threshold = (
+        reference_performance
+        * (1 - maximum_relative_drop)
+    )
+
+    resultado = crear_recomendacion(
+        data_status="critical",
+        current_performance=(
+            performance_threshold + 0.01
+        ),
+        configuracion=RETRAINING_CONFIG,
+    )
+
+    assert resultado["recommended"] is False
+    assert resultado["decision"] == "continue_monitoring"
+    assert resultado["performance_threshold"] == pytest.approx(
+        performance_threshold
+    )
+    assert resultado["automatic_retraining"] is False
+
+
+def test_reentrenamiento_se_evalua_si_drift_y_performance_degradado():
+    """Drift crítico y Recall bajo deben activar evaluación de reentrenamiento."""
+
+    reference_performance = float(
+        RETRAINING_CONFIG[
+            "reference_performance"
+        ]
+    )
+
+    maximum_relative_drop = float(
+        RETRAINING_CONFIG[
+            "maximum_relative_drop"
+        ]
+    )
+
+    performance_threshold = (
+        reference_performance
+        * (1 - maximum_relative_drop)
+    )
+
+    resultado = crear_recomendacion(
+        data_status="critical",
+        current_performance=(
+            performance_threshold - 0.01
+        ),
+        configuracion=RETRAINING_CONFIG,
+    )
+
+    assert resultado["recommended"] is True
+    assert resultado["decision"] == "evaluate_retraining"
+    assert resultado["automatic_retraining"] is False
