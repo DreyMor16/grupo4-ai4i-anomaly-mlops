@@ -1395,13 +1395,23 @@ La detección de drift no implica automáticamente degradación del modelo. Un c
 
 La estrategia utiliza Recall como métrica de desempeño cuando existe ground truth disponible. Como referencia se utiliza el Recall obtenido por el modelo LOF final en test. Se considera una posible degradación cuando el Recall disminuye un 10% o más con respecto a este valor de referencia:
 
+La configuración utilizada es: 
+
 ```text
+performance_metric = recall
 reference_performance = 0.6792
 maximum_relative_drop = 0.10
-performance_threshold = 0.61128
 ```
+Esta configuración se encuentra  en `config/monitoring_thresholds.json`.
 
-Estos valores se encuentran en `config/monitoring_thresholds.json`.
+A partir del Recall de referencia y de la caída relativa máxima permitida, se calcula el `performance_threshold`, que funciona como límite para determinar si el desempeño del modelo ha disminuido de forma significativa.
+
+```text
+performance_threshold
+= reference_performance × (1 - maximum_relative_drop)
+= 0.6792 × (1 - 0.10)
+= 0.61128
+```
 
 La lógica implementada es:
 
@@ -1412,10 +1422,10 @@ Sin drift crítico
 Drift crítico + sin ground truth
 → investigate_drift
 
-Drift crítico + caída del Recall menor al 10%
+Drift crítico + caída del Recall menor al 10% (Recall > performance_threshold)
 → continue_monitoring
 
-Drift crítico + caída del Recall igual o mayor al 10%
+Drift crítico + caída del Recall igual o mayor al 10% (Recall <= performance_threshold)
 → evaluate_retraining
 ```
 
