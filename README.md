@@ -1381,15 +1381,19 @@ La tasa de falsos positivos de referencia se obtiene con las etiquetas de valida
 
 ### 14.6 Alertas y reentrenamiento
 
-Las métricas se clasifican como:
+El nivel de drift detectado se clasifica en tres estados:
 
 ```text
 stable → warning → critical
 ```
 
+- stable: no se detecta un cambio relevante en la distribución de los datos.
+- warning: se detecta un cambio moderado que debe mantenerse bajo observación.
+- critical: se detecta un cambio importante en la distribución de los datos y debe investigarse.
+
 La detección de drift no implica automáticamente degradación del modelo. Un cambio en la distribución de los datos puede deberse a una nueva condición operativa, cambios reales del proceso, instrumentación o problemas de calidad, por lo que el sistema no recomienda reentrenamiento únicamente porque exista drift.
 
-La estrategia utiliza Recall como métrica de desempeño cuando existe ground truth disponible. Como referencia se utiliza el Recall obtenido por el modelo LOF final en test y se considera el reentrenamiento cuando el performance de la métrica disminuye en un 10% o más con respecto a la referencia :
+La estrategia utiliza Recall como métrica de desempeño cuando existe ground truth disponible. Como referencia se utiliza el Recall obtenido por el modelo LOF final en test. Se considera una posible degradación cuando el Recall disminuye un 10% o más con respecto a este valor de referencia:
 
 ```text
 reference_performance = 0.6792
@@ -1397,7 +1401,7 @@ maximum_relative_drop = 0.10
 performance_threshold = 0.61128
 ```
 
-Estos valores se encuentran versionados en `config/monitoring_thresholds.json`.
+Estos valores se encuentran en `config/monitoring_thresholds.json`.
 
 La lógica implementada es:
 
@@ -1408,16 +1412,16 @@ Sin drift crítico
 Drift crítico + sin ground truth
 → investigate_drift
 
-Drift crítico + Recall >= performance_threshold
+Drift crítico + caída del Recall menor al 10%
 → continue_monitoring
 
-Drift crítico + Recall < performance_threshold
+Drift crítico + caída del Recall igual o mayor al 10%
 → evaluate_retraining
 ```
 
-Cuando todavía no existen etiquetas reales en producción, el sistema no calcula performance ni asume degradación. En ese caso, un drift crítico genera una recomendación de investigación y no de reentrenamiento.
+Cuando todavía no existen etiquetas reales en producción, el sistema no calcula el desempeño ni asume degradación. En ese caso, un drift crítico genera una recomendación de investigación y no de reentrenamiento.
 
-El reentrenamiento nunca es automático. Incluso cuando se cumple la condición de drift crítico y degradación del Recall, la salida es únicamente `evaluate_retraining`. La decisión requiere revisar la causa del cambio, generar nuevos experimentos en MLflow, comparar candidatos contra el modelo de producción y promover una nueva versión mediante Model Registry.
+El reentrenamiento nunca es automático. Incluso cuando se cumple la condición de drift crítico y una caída del Recall igual o superior al 10%, la salida es únicamente evaluate_retraining. La decisión requiere revisar la causa del cambio, generar nuevos experimentos en MLflow, comparar candidatos contra el modelo de producción y promover una nueva versión mediante Model Registry.
 
 
 
