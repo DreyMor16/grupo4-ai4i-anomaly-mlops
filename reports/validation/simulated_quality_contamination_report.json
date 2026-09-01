@@ -1,0 +1,94 @@
+{
+  "fecha_ejecucion_utc": "2026-09-01T00:43:13.500424+00:00",
+  "dataset": "data/processed/quality_simulation/contaminated_batch.csv",
+  "estado_general": "FAIL",
+  "reglas_totales": 12,
+  "reglas_aprobadas": 5,
+  "reglas_fallidas": 7,
+  "resultados": [
+    {
+      "nombre": "filas_minimas",
+      "aprobada": true,
+      "valor_observado": "501",
+      "criterio_esperado": ">= 30",
+      "detalle": "Se encontraron 501 filas; se requieren al menos 30."
+    },
+    {
+      "nombre": "esquema_columnas",
+      "aprobada": false,
+      "valor_observado": "13",
+      "criterio_esperado": "14",
+      "detalle": "Faltantes: ['Process temperature']; adicionales: ninguna."
+    },
+    {
+      "nombre": "tasa_valores_faltantes",
+      "aprobada": false,
+      "valor_observado": "0.000154",
+      "criterio_esperado": "<= 0.000000",
+      "detalle": "Se encontraron 1 valores faltantes en 6513 celdas."
+    },
+    {
+      "nombre": "marcadores_de_faltantes",
+      "aprobada": true,
+      "valor_observado": "Ninguno",
+      "criterio_esperado": "0 marcadores",
+      "detalle": "Marcadores encontrados: ninguno."
+    },
+    {
+      "nombre": "tasa_filas_duplicadas",
+      "aprobada": false,
+      "valor_observado": "0.001996",
+      "criterio_esperado": "<= 0.000000",
+      "detalle": "Se encontraron 1 filas completamente duplicadas."
+    },
+    {
+      "nombre": "tipos_numericos",
+      "aprobada": false,
+      "valor_observado": "No numéricas: ['Rotational speed']",
+      "criterio_esperado": "Todas las columnas deben ser numéricas",
+      "detalle": "Ausentes: ['Process temperature']; tipos incorrectos: ['Rotational speed']."
+    },
+    {
+      "nombre": "categorias_permitidas",
+      "aprobada": false,
+      "valor_observado": "{'Type': ['X']}",
+      "criterio_esperado": "Solo categorías configuradas",
+      "detalle": "Problemas encontrados: {'Type': ['X']}."
+    },
+    {
+      "nombre": "dominio_columnas_binarias",
+      "aprobada": true,
+      "valor_observado": "Solo valores 0 y 1",
+      "criterio_esperado": "{0, 1}",
+      "detalle": "Problemas encontrados: ninguno."
+    },
+    {
+      "nombre": "identificadores_unicos",
+      "aprobada": false,
+      "valor_observado": "{'UID': 1, 'Product ID': 1}",
+      "criterio_esperado": "0 duplicados por identificador",
+      "detalle": "Duplicados: {'UID': 1, 'Product ID': 1}; ausentes: ninguna."
+    },
+    {
+      "nombre": "rangos_fisicos",
+      "aprobada": false,
+      "valor_observado": "{'Process temperature': 'Columna ausente', 'Rotational speed': 'Tipo no numérico', 'Torque': '1 valores negativos'}",
+      "criterio_esperado": "0 valores físicamente imposibles",
+      "detalle": "Problemas encontrados: {'Process temperature': 'Columna ausente', 'Rotational speed': 'Tipo no numérico', 'Torque': '1 valores negativos'}."
+    },
+    {
+      "nombre": "clases_variable_objetivo",
+      "aprobada": true,
+      "valor_observado": "[0, 1]",
+      "criterio_esperado": "[0, 1]",
+      "detalle": "Clases observadas: [0, 1]."
+    },
+    {
+      "nombre": "consistencia_etiquetas_falla",
+      "aprobada": true,
+      "valor_observado": "0.001996",
+      "criterio_esperado": "<= 0.003000",
+      "detalle": "Inconsistencias: 1; columnas ausentes: ninguna."
+    }
+  ]
+}
