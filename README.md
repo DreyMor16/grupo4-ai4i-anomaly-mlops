@@ -1395,7 +1395,7 @@ La detección de drift no implica automáticamente degradación del modelo. Un c
 
 La estrategia utiliza Recall como métrica de desempeño cuando existe ground truth disponible. Como referencia se utiliza el Recall obtenido por el modelo LOF final en test. Se considera una posible degradación cuando el Recall disminuye un 10% o más con respecto a este valor de referencia:
 
-La configuración utilizada es: 
+La configuración utilizada es:
 
 ```text
 performance_metric = recall

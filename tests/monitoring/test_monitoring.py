@@ -425,3 +425,51 @@ def test_reentrenamiento_se_evalua_si_drift_y_performance_degradado():
     assert resultado["recommended"] is True
     assert resultado["decision"] == "evaluate_retraining"
     assert resultado["automatic_retraining"] is False
+
+def test_reentrenamiento_se_evalua_en_limite_exacto():
+    """Una caída relativa exacta del 10% debe activar evaluación."""
+
+    reference_performance = float(
+        RETRAINING_CONFIG[
+            "reference_performance"
+        ]
+    )
+
+    maximum_relative_drop = float(
+        RETRAINING_CONFIG[
+            "maximum_relative_drop"
+        ]
+    )
+
+    performance_threshold = (
+        reference_performance
+        * (
+            1
+            - maximum_relative_drop
+        )
+    )
+
+    resultado = crear_recomendacion(
+        data_status="critical",
+        current_performance=performance_threshold,
+        configuracion=RETRAINING_CONFIG,
+    )
+
+    assert resultado["recommended"] is True
+    assert (
+        resultado["decision"]
+        == "evaluate_retraining"
+    )
+    assert resultado[
+        "current_performance"
+    ] == pytest.approx(
+        performance_threshold
+    )
+    assert resultado[
+        "performance_threshold"
+    ] == pytest.approx(
+        performance_threshold
+    )
+    assert resultado[
+        "automatic_retraining"
+    ] is False

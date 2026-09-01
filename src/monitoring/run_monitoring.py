@@ -1172,7 +1172,7 @@ def crear_recomendacion(
             ),
         }
 
-    if current_performance < performance_threshold:
+    if current_performance <= performance_threshold:
         return {
             "recommended": True,
             "decision": "evaluate_retraining",
