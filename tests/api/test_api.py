@@ -216,5 +216,24 @@ def test_mensaje_de_error_es_informativo(client):
         for campo in campos_reportados
     )
 
+def test_predict_batch_rechaza_filas_duplicadas(client):
+    """El endpoint batch debe bloquear registros idénticos."""
 
+    respuesta = client.post(
+        "/predict/batch",
+        json={
+            "instances": [
+                INPUT_VALIDO.copy(),
+                INPUT_VALIDO.copy(),
+            ]
+        },
+    )
+
+    assert respuesta.status_code == 422
+
+    detalle = respuesta.json()["detail"]
+
+    assert "filas duplicadas" in detalle.lower()
+    assert "fila 2" in detalle.lower()
+    assert "fila 1" in detalle.lower()
     

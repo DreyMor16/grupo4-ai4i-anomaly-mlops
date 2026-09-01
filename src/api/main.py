@@ -243,6 +243,70 @@ app.mount(
 )
 
 
+def validar_calidad_lote(
+    entradas: list[MachineInput],
+) -> None:
+    """Bloquea filas completamente duplicadas en un lote."""
+
+    registros_vistos = {}
+    filas_duplicadas = []
+
+    for numero_fila, entrada in enumerate(
+        entradas,
+        start=1,
+    ):
+        registro = entrada.to_record()
+
+        clave_registro = tuple(
+            sorted(
+                registro.items()
+            )
+        )
+
+        if clave_registro in registros_vistos:
+            filas_duplicadas.append(
+                (
+                    numero_fila,
+                    registros_vistos[
+                        clave_registro
+                    ],
+                )
+            )
+        else:
+            registros_vistos[
+                clave_registro
+            ] = numero_fila
+
+    if not filas_duplicadas:
+        return
+
+    detalles = [
+        (
+            f"fila {fila_duplicada} "
+            f"(duplica la fila {fila_original})"
+        )
+        for (
+            fila_duplicada,
+            fila_original,
+        ) in filas_duplicadas[:10]
+    ]
+
+    mensaje = ", ".join(
+        detalles
+    )
+
+    if len(filas_duplicadas) > 10:
+        mensaje += ", ..."
+
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            "El lote contiene filas duplicadas: "
+            f"{mensaje}."
+        ),
+    )
+
+
 def generar_predicciones(
     request,
     entradas,
@@ -284,14 +348,20 @@ def generar_predicciones(
 
             predicciones.append(
                 PredictionResponse(
-                    anomaly=bool(prediction == 1),
+                    anomaly=bool(
+                        prediction == 1
+                    ),
                     prediction=prediction,
                     anomaly_score=float(
                         fila["anomaly_score"]
                     ),
-                    model_name=metadata["model_name"],
+                    model_name=metadata[
+                        "model_name"
+                    ],
                     model_version=str(
-                        metadata["model_version"]
+                        metadata[
+                            "model_version"
+                        ]
                     ),
                 )
             )
@@ -317,7 +387,9 @@ def generar_predicciones(
 
         if request_id is None:
             request_id = uuid4().hex
-            request.state.request_id = request_id
+            request.state.request_id = (
+                request_id
+            )
 
         registrar_predicciones(
             request_id=request_id,
@@ -411,7 +483,9 @@ def root():
     """Describe brevemente el servicio."""
 
     return {
-        "service": "AI4I Anomaly Detection API",
+        "service": (
+            "AI4I Anomaly Detection API"
+        ),
         "interface": "/ui",
         "monitoring": "/monitoring",
         "documentation": "/docs",
@@ -482,6 +556,10 @@ def predict_batch(
     request: Request,
 ):
     """Realiza inferencia para un lote de máquinas."""
+
+    validar_calidad_lote(
+        lote.instances
+    )
 
     predicciones = generar_predicciones(
         request,

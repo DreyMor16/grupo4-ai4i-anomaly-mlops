@@ -194,6 +194,142 @@ function establecerCarga(boton, cargando) {
     );
 }
 
+function formatearDetalleError(detalle) {
+    if (typeof detalle === "string") {
+        return detalle;
+    }
+
+    if (!Array.isArray(detalle)) {
+        return "Los datos enviados no son válidos.";
+    }
+
+    const nombresCampos = {
+        Type: "Tipo de producto",
+        "Air temperature": "Temperatura del aire",
+        "Process temperature": "Temperatura del proceso",
+        "Rotational speed": "Velocidad rotacional",
+        Torque: "Torque",
+        "Tool wear": "Desgaste de herramienta",
+    };
+
+    return detalle
+        .map((error) => {
+            const ubicacion = Array.isArray(error.loc)
+                ? error.loc.filter((parte) => {
+                    return (
+                        parte !== "body"
+                        && parte !== "instances"
+                    );
+                })
+                : [];
+
+            const indiceFila = ubicacion.find(
+                (parte) => {
+                    return Number.isInteger(parte);
+                }
+            );
+
+            const campoTecnico = [...ubicacion]
+                .reverse()
+                .find((parte) => {
+                    return typeof parte === "string";
+                });
+
+            const campo = campoTecnico
+                ? (
+                    nombresCampos[campoTecnico]
+                    || campoTecnico
+                )
+                : null;
+
+            let lugar = "Datos enviados";
+
+            if (indiceFila !== undefined) {
+                lugar = `Fila ${indiceFila + 1}`;
+            }
+
+            if (campo) {
+                lugar += `, ${campo}`;
+            }
+
+            let mensaje = "contiene un valor inválido";
+
+            switch (error.type) {
+                case "missing":
+                    mensaje = "es obligatorio";
+                    break;
+
+                case "extra_forbidden":
+                    mensaje = "no está permitido";
+                    break;
+
+                case "literal_error":
+                    mensaje = (
+                        "debe contener una categoría "
+                        + "permitida: L, M o H"
+                    );
+                    break;
+
+                case "float_parsing":
+                case "float_type":
+                    mensaje = "debe contener un número válido";
+                    break;
+
+                case "greater_than":
+                    mensaje = (
+                        "debe ser mayor que "
+                        + String(error.ctx?.gt ?? 0)
+                    );
+                    break;
+
+                case "greater_than_equal":
+                    mensaje = (
+                        "debe ser mayor o igual que "
+                        + String(error.ctx?.ge ?? 0)
+                    );
+                    break;
+
+                case "less_than":
+                    mensaje = (
+                        "debe ser menor que "
+                        + String(error.ctx?.lt ?? "")
+                    );
+                    break;
+
+                case "less_than_equal":
+                    mensaje = (
+                        "debe ser menor o igual que "
+                        + String(error.ctx?.le ?? "")
+                    );
+                    break;
+
+                case "finite_number":
+                    mensaje = "debe contener un número finito";
+                    break;
+
+                case "list_type":
+                    mensaje = "debe ser una lista de registros";
+                    break;
+
+                case "too_long":
+                    mensaje = (
+                        "supera la cantidad máxima "
+                        + "de registros permitidos"
+                    );
+                    break;
+
+                default:
+                    if (typeof error.msg === "string") {
+                        mensaje = error.msg;
+                    }
+            }
+
+            return `${lugar}: ${mensaje}.`;
+        })
+        .join(" ");
+}
+
+
 async function solicitarJson(ruta, opciones = {}) {
     const respuesta = await fetch(
         ruta,
@@ -215,20 +351,20 @@ async function solicitarJson(ruta, opciones = {}) {
     }
 
     if (!respuesta.ok) {
-        let mensaje =
-            `La solicitud falló con código ${respuesta.status}.`;
+        let mensaje = (
+            `La solicitud falló con código `
+            + `${respuesta.status}.`
+        );
 
         if (contenido?.detail) {
-            if (typeof contenido.detail === "string") {
-                mensaje = contenido.detail;
-            } else {
-                mensaje = JSON.stringify(
-                    contenido.detail
-                );
-            }
+            mensaje = formatearDetalleError(
+                contenido.detail
+            );
         }
 
-        throw new Error(mensaje);
+        throw new Error(
+            mensaje
+        );
     }
 
     return contenido;
@@ -612,16 +748,25 @@ function dividirCSV(texto, separador) {
 }
 
 function convertirNumero(valor, fila, columna) {
+    const texto = String(
+        valor ?? ""
+    ).trim();
+
+    if (!texto) {
+        throw new Error(
+            `La fila ${fila} contiene un valor `
+            + `faltante en "${columna}".`
+        );
+    }
+
     const numero = Number(
-        String(valor)
-            .trim()
-            .replace(",", ".")
+        texto.replace(",", ".")
     );
 
     if (!Number.isFinite(numero)) {
         throw new Error(
             `La fila ${fila} contiene un valor `
-            + `inválido en "${columna}".`
+            + `no numérico en "${columna}": "${texto}".`
         );
     }
 
@@ -660,6 +805,38 @@ function convertirCSV(texto) {
             return encabezado.trim();
         });
 
+    const encabezadosVacios =
+        encabezados.filter(
+            (encabezado) => {
+                return !encabezado;
+            }
+        );
+
+    if (encabezadosVacios.length > 0) {
+        throw new Error(
+            "El archivo contiene columnas sin nombre."
+        );
+    }
+
+    const columnasDuplicadas = [
+        ...new Set(
+            encabezados.filter(
+                (encabezado, indice) => {
+                    return encabezados.indexOf(
+                        encabezado
+                    ) !== indice;
+                }
+            )
+        ),
+    ];
+
+    if (columnasDuplicadas.length > 0) {
+        throw new Error(
+            "El archivo contiene columnas duplicadas: "
+            + columnasDuplicadas.join(", ")
+        );
+    }
+
     const columnasFaltantes =
         columnasRequeridas.filter(
             (columna) => {
@@ -676,6 +853,22 @@ function convertirCSV(texto) {
         );
     }
 
+    const columnasAdicionales =
+        encabezados.filter(
+            (columna) => {
+                return !columnasRequeridas.includes(
+                    columna
+                );
+            }
+        );
+
+    if (columnasAdicionales.length > 0) {
+        throw new Error(
+            "El archivo contiene columnas no permitidas: "
+            + columnasAdicionales.join(", ")
+        );
+    }
+
     if (filas.length > MAXIMO_REGISTROS) {
         throw new Error(
             `El archivo contiene ${filas.length} registros. `
@@ -683,9 +876,21 @@ function convertirCSV(texto) {
         );
     }
 
-    return filas.map(
+    const registros = filas.map(
         (valores, indice) => {
             const filaOriginal = indice + 2;
+
+            if (
+                valores.length
+                !== encabezados.length
+            ) {
+                throw new Error(
+                    `La fila ${filaOriginal} contiene `
+                    + `${valores.length} valores, pero se `
+                    + `esperaban ${encabezados.length}.`
+                );
+            }
+
             const registro = {};
 
             encabezados.forEach(
@@ -695,14 +900,24 @@ function convertirCSV(texto) {
                 }
             );
 
-            const tipo = String(
-                registro.Type
-            ).trim().toUpperCase();
+            const tipoOriginal = String(
+                registro.Type ?? ""
+            ).trim();
+
+            if (!tipoOriginal) {
+                throw new Error(
+                    `La fila ${filaOriginal} contiene `
+                    + 'un valor faltante en "Type".'
+                );
+            }
+
+            const tipo =
+                tipoOriginal.toUpperCase();
 
             if (!["L", "M", "H"].includes(tipo)) {
                 throw new Error(
                     `La fila ${filaOriginal} contiene `
-                    + `un Type inválido: "${tipo}".`
+                    + `un Type inválido: "${tipoOriginal}".`
                 );
             }
 
@@ -746,6 +961,46 @@ function convertirCSV(texto) {
             };
         }
     );
+
+    const registrosVistos = new Map();
+    const filasDuplicadas = [];
+
+    registros.forEach(
+        (registro, indice) => {
+            const clave = JSON.stringify(
+                registro
+            );
+
+            if (registrosVistos.has(clave)) {
+                filasDuplicadas.push(
+                    `${indice + 2} `
+                    + `(igual a la fila `
+                    + `${registrosVistos.get(clave)})`
+                );
+            } else {
+                registrosVistos.set(
+                    clave,
+                    indice + 2
+                );
+            }
+        }
+    );
+
+    if (filasDuplicadas.length > 0) {
+        throw new Error(
+            "El archivo contiene filas duplicadas: "
+            + filasDuplicadas
+                .slice(0, 10)
+                .join(", ")
+            + (
+                filasDuplicadas.length > 10
+                    ? "..."
+                    : ""
+            )
+        );
+    }
+
+    return registros;
 }
 
 function limpiarArchivo() {
