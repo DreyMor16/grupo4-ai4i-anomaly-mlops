@@ -53,6 +53,8 @@ La fuente y las reglas para trabajar con los datos están explicadas en [`data/R
 
 La solución está organizada en componentes independientes que cubren el ciclo completo de MLOps:
 
+![Arquitectura MLOps del sistema AI4I](docs/architecture/mlops_architecture.png)
+
 ```text
 Sistema MLOps AI4I
 ├── Datos e ingesta
