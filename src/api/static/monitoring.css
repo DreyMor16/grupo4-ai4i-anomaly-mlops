@@ -623,6 +623,33 @@ tbody tr:last-child td {
     border-left-color: var(--critical);
 }
 
+.decision.monitoring {
+    border-left-color: var(--stable);
+}
+
+.decision.investigating {
+    border-left-color: var(--warning);
+}
+
+.decision.retraining {
+    border-left-color: var(--critical);
+}
+
+.decision.monitoring .decision-badge {
+    color: var(--stable);
+    background: var(--stable-soft);
+}
+
+.decision.investigating .decision-badge {
+    color: var(--warning);
+    background: var(--warning-soft);
+}
+
+.decision.retraining .decision-badge {
+    color: var(--critical);
+    background: var(--critical-soft);
+}
+
 .decision h2 {
     margin-bottom: 0.35rem;
 }

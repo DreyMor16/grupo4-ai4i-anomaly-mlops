@@ -545,7 +545,29 @@ function renderAlerts(alerts) {
 }
 
 
-function renderDecision(recommendation) {
+function formatDecisionPercentage(value) {
+    if (
+        value === null
+        || value === undefined
+        || !Number.isFinite(Number(value))
+    ) {
+        return null;
+    }
+
+    return new Intl.NumberFormat(
+        "es-CR",
+        {
+            style: "percent",
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }
+    ).format(
+        Number(value)
+    );
+}
+
+
+function renderDecision(recommendation = {}) {
     const panel = getElement(
         "decision-panel"
     );
@@ -558,37 +580,155 @@ function renderDecision(recommendation) {
         "decision-message"
     );
 
-    const recommended = Boolean(
-        recommendation.recommended
+    const decision = (
+        recommendation.decision
+        || (
+            recommendation.recommended
+                ? "evaluate_retraining"
+                : "continue_monitoring"
+        )
     );
 
-    panel.classList.toggle(
-        "retraining",
-        recommended
+    const decisionConfig = {
+        continue_monitoring: {
+            className: "monitoring",
+            badge: "Continuar monitoreo",
+            fallback: (
+                "No existe evidencia suficiente para "
+                + "evaluar reentrenamiento."
+            ),
+        },
+
+        investigate_drift: {
+            className: "investigating",
+            badge: "Investigar drift",
+            fallback: (
+                "Existe drift crítico, pero todavía "
+                + "no hay ground truth para confirmar "
+                + "una degradación del modelo."
+            ),
+        },
+
+        evaluate_retraining: {
+            className: "retraining",
+            badge: "Evaluar reentrenamiento",
+            fallback: (
+                "Existe drift crítico y el desempeño "
+                + "cayó 10% o más con respecto "
+                + "a la referencia."
+            ),
+        },
+    };
+
+    const selected = (
+        decisionConfig[decision]
+        || decisionConfig.continue_monitoring
+    );
+
+    panel.classList.remove(
+        "monitoring",
+        "investigating",
+        "retraining"
+    );
+
+    panel.classList.add(
+        selected.className
     );
 
     badge.textContent = (
-        recommended
-        ? "Evaluar reentrenamiento"
-        : "Continuar monitoreo"
+        selected.badge
+    );
+
+    const messageParts = [];
+
+    if (
+        decision === "evaluate_retraining"
+    ) {
+        messageParts.push(
+            "Existe drift crítico y el desempeño "
+            + "cayó 10% o más con respecto "
+            + "a la referencia."
+        );
+    } else if (
+        Array.isArray(recommendation.reasons)
+        && recommendation.reasons.length > 0
+    ) {
+        messageParts.push(
+            recommendation.reasons.join(" ")
+        );
+    } else {
+        messageParts.push(
+            selected.fallback
+        );
+    }
+
+    const referencePerformance = (
+        formatDecisionPercentage(
+            recommendation.reference_performance
+        )
+    );
+
+    const currentPerformance = (
+        formatDecisionPercentage(
+            recommendation.current_performance
+        )
     );
 
     if (
-        recommended
-        && recommendation.reasons?.length
+        decision !== "evaluate_retraining"
+        && referencePerformance
     ) {
-        message.textContent = (
-            recommendation.reasons.join(
-                " "
-            )
-            + " La decisión requiere validación humana y comparación en MLflow."
-        );
-    } else {
-        message.textContent = (
-            "No existe evidencia suficiente para reentrenar. "
-            + "El modelo puede continuar bajo monitoreo."
+        messageParts.push(
+            `Recall de referencia: ${referencePerformance}.`
         );
     }
+
+    if (
+        decision !== "evaluate_retraining"
+        && currentPerformance
+    ) {
+        messageParts.push(
+            `Recall actual: ${currentPerformance}.`
+        );
+    } else if (
+        decision === "investigate_drift"
+    ) {
+        messageParts.push(
+            "Recall actual: no disponible "
+            + "por falta de ground truth."
+        );
+    }
+
+    if (
+        decision === "evaluate_retraining"
+    ) {
+        messageParts.push(
+            "La decisión requiere validación humana, "
+            + "comparación de candidatos en MLflow "
+            + "y promoción controlada."
+        );
+    }
+
+    if (
+        decision === "continue_monitoring"
+    ) {
+        messageParts.push(
+            "El modelo continúa bajo monitoreo."
+        );
+    }
+
+    if (
+        decision === "investigate_drift"
+    ) {
+        messageParts.push(
+            "Se debe investigar la causa del drift "
+            + "antes de tomar una decisión."
+        );
+    }
+
+    message.textContent = (
+        messageParts.join(" ")
+    );
 }
 
 
