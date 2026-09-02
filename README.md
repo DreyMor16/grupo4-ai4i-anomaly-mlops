@@ -23,14 +23,13 @@ El flujo Git utilizado es:
 ```text
 feature/<tarea> → develop → main
 ```
+> Consulta la [guía rápida de reproducción](REPRODUCIR.md) para reconstruir y ejecutar el proyecto desde cero.
 
 ## 1. Business Problem
 
-Queremos detectar cuándo una máquina presenta un comportamiento anómalo.
+El objetivo del proyecto es detectar comportamientos anómalos en las condiciones de operación de una máquina que puedan estar asociados con una falla. La solución recibe variables como temperatura, velocidad de rotación, torque, desgaste de herramienta y tipo de producto, y devuelve un `anomaly_score` junto con una clasificación normal/anómala.
 
-El sistema recibirá datos como temperatura, velocidad, torque y desgaste. Con esos valores deberá indicar si el comportamiento parece normal o anómalo.
-
-La columna `Machine failure` se utilizará para comprobar si las anomalías detectadas están relacionadas con fallas reales del dataset.
+El problema se aborda como **detección de anomalías**, no como clasificación supervisada tradicional. La columna `Machine failure` se utiliza como referencia para evaluar qué tan relacionadas están las anomalías detectadas con las fallas reales del dataset.
 
 ## 2. Dataset
 
@@ -40,6 +39,8 @@ Utilizaremos el dataset **AI4I 2020 Predictive Maintenance**.
 - Archivo original: `ai4i2020.csv`.
 - Cantidad de filas: 10.000.
 - Cantidad de columnas: 14.
+- Observaciones normales: 9.661.
+- Fallas (`Machine failure = 1`): 339, aproximadamente 3,39 % del dataset.
 
 El archivo CSV **no se sube a GitHub**. Cuando se implemente la ingesta, el programa lo guardará localmente en:
 
@@ -57,43 +58,61 @@ La solución está organizada en componentes independientes que cubren el ciclo 
 
 ```text
 Sistema MLOps AI4I
-├── Datos e ingesta
+├── Desarrollo y datos
 │   ├── Dataset AI4I 2020 de UCI
 │   ├── Ingesta reproducible
-│   └── Dataset raw identificado mediante SHA-256
-├── Calidad y preparación
+│   ├── Raw Data versionado mediante SHA-256
 │   ├── Data Quality Gates
-│   ├── Diagnóstico y EDA
-│   └── Feature engineering y preprocesamiento reutilizable
-├── Experimentación
-│   ├── Entrenamiento de detectores de anomalías
-│   ├── Seguimiento de experimentos con MLflow
-│   └── Model Registry: candidate, validation y production
-├── Despliegue
+│   ├── EDA
+│   ├── Feature Engineering y preprocesamiento reutilizable
+│   └── Entrenamiento y comparación de modelos
+├── Gestión y despliegue
+│   ├── MLflow Tracking
+│   ├── Model Registry
+│   │   └── candidate → final validation → production
 │   ├── Bundle de modelo, preprocessor y metadata
-│   ├── API de inferencia con FastAPI
-│   └── Contenedor Docker
-└── Operación
-    ├── Recolección de eventos
-    ├── System, Data y Model Monitoring
-    ├── Alertas y simulación de drift
-    └── Estrategia controlada de reentrenamiento
+│   └── Docker + FastAPI
+├── Operación
+│   ├── Predicción individual y batch
+│   ├── Recolección de eventos
+│   ├── System Monitoring
+│   ├── Data Monitoring
+│   ├── Model Monitoring
+│   ├── Drift y Quality Alerts
+│   └── Decisión controlada de reentrenamiento
+└── Componentes transversales
+    ├── Configuración versionada
+    ├── Pruebas automatizadas (Datos, modelo, API y monitoreo)
+    ├── Reportes auditables
+    └── Git
 ```
 
-Cada componente de la arquitectura corresponde con una implementación del repositorio:
+Los principales componentes de la arquitectura se encuentran implementados en los siguientes módulos del repositorio:
 
 | Componente | Implementación |
 |---|---|
-| Ingesta | `src/ingestion/ingest.py` |
+| Ingesta reproducible | `src/ingestion/ingest.py` |
 | Validación de calidad | `src/validation/validate.py` |
-| EDA | `notebooks/` |
-| Feature engineering | `src/feature_engineering/preprocessing.py` |
-| Entrenamiento | `src/training/` |
-| MLflow Model Registry | `src/training/model_registry/` |
-| API | `src/api/` |
+| Análisis de calidad y EDA | `notebooks/` |
+| Feature engineering y preprocesamiento | `src/feature_engineering/preprocessing.py` |
+| Pipeline de validación y entrenamiento | `src/pipeline/run_training.py` |
+| Entrenamiento y seguimiento de experimentos con MLflow | `src/training/` |
+| Registro de candidatos MLflow Model Registry | `src/training/model_registry/register_candidates.py` |
+| Validación final de candidatos | `src/training/model_registry/validate_candidates.py`|
+| Promoción a producción | `src/training/model_registry/promote_production.py` |
+| Exportación del bundle de producción | `src/api/export_production_bundle.py` |
+| API FastAPI | `src/api/` |
 | Docker | `Dockerfile` |
-| Monitoreo y drift | `src/monitoring/` |
+| Predicción individual y batch | `endpoints /predict` y `/predict/batch` en `src/api/` |
+| Recolección de eventos | `src/monitoring/collector.py` |
+| Monitoreo de sistema, datos y modelo |	`src/monitoring/run_monitoring.py` |
+| Perfil de referencia de monitoreo	| `src/monitoring/build_reference.py` |
+| Simulación de drift |	`src/monitoring/simulate_drift.py` |
+| Estrategia de reentrenamiento |	`src/monitoring/run_monitoring.py` |
+|Configuración versionada | `config/`|
 | Pruebas automatizadas | `tests/` |
+| Reportes auditables | `reports/` |
+| Control de versiones | Git/GitHub |
 
 ## 4. Repository Structure
 
@@ -106,13 +125,17 @@ Las carpetas principales son:
 | `data/interim/` | Datos temporales. |
 | `data/processed/` | Datos preparados para el modelo. |
 | `data/production/` | Datos usados para simular producción. |
+| `artifacts/` | Artefactos necesarios para despliegue, incluyendo el bundle del modelo de producción. No se sube a GitHub. |
 | `docs/` | Decisiones y documentación técnica. |
+| `logs/` | Logs generados durante la operación y el monitoreo. No se sube a GitHub. |
 | `notebooks/` | Análisis exploratorio y pruebas. |
+| `reports/` | Reportes generados por validación, monitoreo y simulaciones. |
 | `src/ingestion/` | Código para obtener los datos. |
 | `src/validation/` | Reglas de calidad de datos. |
 | `src/feature_engineering/` | Feature engineering y preprocesamiento |
-| `src/training/` | Entrenamiento y evaluación. |
-| `src/api/` | API que entregará predicciones. |
+| `src/pipeline/` | Integración del flujo de validación y entrenamiento. |
+| `src/training/` | Entrenamiento, experimentación, evaluación y gestión de modelos. |
+| `src/api/` | API de inferencia, interfaz web y exportación del bundle de producción. |
 | `src/monitoring/` | Monitoreo, drift y alertas. |
 | `tests/` | Pruebas automáticas. |
 
@@ -184,7 +207,7 @@ El diagnóstico exploratorio se encuentra en:
 notebooks/01_data_quality_analysis.ipynb
 ```
 
-El notebook utiliza `data/raw/ai4i2020.csv`, generado por la ingesta. Analiza valores faltantes, duplicados, tipos, categorías, rangos físicos, valores extremos, cardinalidad, asimetría, desbalance, correlación y riesgo de fuga de información.
+El [Notebook](./notebooks\01_data_quality_analysis.ipynb) utiliza `data/raw/ai4i2020.csv`, generado por la ingesta. Analiza valores faltantes, duplicados, tipos, categorías, rangos físicos, valores extremos, cardinalidad, asimetría, desbalance, correlación y riesgo de fuga de información.
 
 El diagnóstico conserva la capa raw sin modificaciones y justifica cada decisión.
 
@@ -258,9 +281,11 @@ El diagnóstico exploratorio se encuentra en:
 notebooks/02_exploratory_data_analysis.ipynb
 ```
 
-El notebook utiliza `data/raw/ai4i2020.csv`, generado por la ingesta. Se realizó un análisis del comportamiento estadístico y las relaciones entre las variables del dataset AI4I 2020 antes del preprocesamiento y modelado, con el fin de justificar las decisiones tomadas durante la etapa de ingeniería de características y el preprocesamiento.
+El [notebook](./notebooks/02_exploratory_data_analysis.ipynb) utiliza `data/raw/ai4i2020.csv`, generado por la ingesta. Se realizó un análisis del comportamiento estadístico y las relaciones entre las variables del dataset AI4I 2020 antes del preprocesamiento y modelado, con el fin de justificar las decisiones tomadas durante la etapa de ingeniería de características y el preprocesamiento.
 
 Los resultados del EDA permitieron definir las transformaciones que posteriormente se incorporaron al pipeline de preprocesamiento.
+
+Las variables derivadas fueron: `Temperature difference`, para representar el comportamiento térmico entre proceso y ambiente; `Power`, para combinar torque y velocidad de rotación en una magnitud mecánica; y `Torque_ToolWear_Product`, para representar la interacción entre carga y desgaste. Su utilidad se evaluó empíricamente mediante diferentes feature sets durante la experimentación.
 
 ### 8.1 Feature Engineering y Preprocesamiento
 
@@ -269,57 +294,63 @@ A partir de las decisiones obtenidas durante el EDA, se implementó un pipeline 
 
 El flujo de preparación de los datos es:
 ```text
-data/raw/ai4i2020.csv (datos de la ingesta)
-        ↓
-Carga automática del dataset
-        ↓
-Corrección de inconsistencias en Machine failure
-si las fallas RNF = 1 y Machine failure = 0
-→ Machine failure = 1
-        ↓
-Creación de variables derivadas
- (feature engineering)
- Temperature difference
-Power
-Torque_ToolWear_Product
-        ↓
-Selección del feature set
-        ↓
-División estratificada 
-70% train y 30% temporal
-        ↓
-┌─────────────────┬─────────────────┐
-│     X_train     │      X_temp     │
-│       70%       │       30%       │
-└────────┬────────┴────────┬────────┘
-         │                 ↓
-         │       Segunda división con
-         │       train_test_split
-         │       50% validation / 50% test
-         │       con stratify=y_temp 
-         |
-         │       ┌──────────────┬──────────────┐
-         │       │    X_val     │    X_test    │
-         │       │     15%      │     15%      │
-         │       └──────┬───────┴──────┬───────┘
-         │              │              │
-         ↓              ↓              ↓
-         X_train               X_val               X_test
-            ↓                    ↓                    ↓
-Selección según approach         │                    │
-            ↓                    │                    │
-   fit_transform()          transform()          transform()
-            ↓                    ↓                    ↓
-     RobustScaler           RobustScaler          RobustScaler
-     OneHotEncoder          OneHotEncoder         OneHotEncoder
-            ↓                    ↓                    ↓
- X_train procesado      X_val procesado      X_test procesado
+      data/raw/ai4i2020.csv (datos de la ingesta)
+                        ↓
+            Carga automática del dataset
+                        ↓
+            Corrección de inconsistencias en Machine failure
+            si las fallas RNF = 1 y Machine failure = 0
+            → Machine failure = 1
+                        ↓
+            Creación de variables derivadas
+            (feature engineering)
+            Temperature difference
+                    Power
+            Torque_ToolWear_Product
+                        ↓
+            Selección del feature set
+                        ↓
+            División estratificada
+            70% train y 30% temporal
+                        ↓
+┌─────────────────────┬─────────────────────┐
+│       X_train       │       X_temp        │
+│         70%         │         30%         │
+└──────────┬──────────┴──────────┬──────────┘
+           │                     ↓
+           │          Segunda división con
+           │          train_test_split
+           │          50% validation / 50% test
+           │          con stratify=y_temp
+           │                     ↓
+           │          ┌────────────────┬────────────────┐
+           │          │     X_val      │     X_test     │
+           │          │      15%       │      15%       │
+           │          └────────┬───────┴────────┬───────┘
+           │                   │                │
+           ↓                   ↓                ↓
+       X_train               X_val            X_test
+           ↓                   │                │
+Selección según approach       │                │
+           ↓                   │                │
+    fit_transform()         transform()      transform()
+           ↓                   ↓                ↓
+     RobustScaler          RobustScaler     RobustScaler
+     OneHotEncoder         OneHotEncoder    OneHotEncoder
+           ↓                   ↓                ↓
+ X_train procesado      X_val procesado   X_test procesado
 ```
+El preprocessor se ajusta únicamente sobre los datos de entrenamiento mediante fit_transform() y el mismo objeto se reutiliza sobre validation y test mediante transform().
 
 En el enfoque `semi_supervised`, `Machine failure` se utiliza únicamente para seleccionar los registros normales de `train`. La etiqueta no se incorpora como variable predictora. `Validation` y `test` mantienen observaciones normales y fallas.
 
 El feature engineering se realiza antes de seleccionar el conjunto de variables. El `RobustScaler` y el `OneHotEncoder` se ajustan únicamente con los datos utilizados para entrenamiento y posteriormente se aplican sin reajuste a validation y test.
 
+Para la evaluación del modelo se utilizó un esquema hold-out reproducible 70/15/15, con particiones estratificadas para conservar la proporción de fallas en cada conjunto. Esta estrategia permitió separar claramente las etapas de entrenamiento, ajuste y evaluación final: train se utilizó para ajustar los modelos, validation para comparar configuraciones, ajustar hiperparámetros y seleccionar thresholds, y test se mantuvo reservado hasta la evaluación final de los candidatos registrados.
+
+Este esquema fue especialmente adecuado para el enfoque semi_supervised utilizado en el proyecto, ya que únicamente el conjunto de entrenamiento puede filtrarse mediante Machine failure para seleccionar observaciones normales, mientras que validation y test deben conservar tanto casos normales como fallas para evaluar el desempeño del detector. Además, mantener un conjunto de test completamente independiente permitió estimar el comportamiento final de los modelos sin que las decisiones tomadas durante la experimentación influyeran sobre esa evaluación.
+
+Por estas razones, se optó por este esquema hold-out en lugar de utilizar validación cruzada como estrategia principal. La validación cruzada podría incorporarse en trabajos futuros como análisis complementario para estudiar la variabilidad del desempeño entre distintas particiones.
 
 ### 8.2 Uso del preprocesamiento durante el entrenamiento
 
@@ -349,7 +380,7 @@ Posteriormente, el módulo de preprocesamiento consume directamente el archivo g
 ) = preprocesar_datos(
     feature_set="engineered_only",
     approach="semi_supervised",
-    ramdom_state=42
+    random_state=42
 )
 ```
 
@@ -426,13 +457,17 @@ El `preprocessor` utilizado para preparar nuevos datos debe ser exactamente el m
 
 ## 9. Train 
 
-### 9.1 Experimentos
+### 9.1 Criterios de evaluación 
 
-Se trabajaron dos enfoques (approach):
+El dataset presenta un fuerte desbalance entre observaciones normales y fallas, por lo que métricas generales como Accuracy pueden dar una impresión engañosa del desempeño al estar dominadas por la clase mayoritaria. Por esta razón, se utiliza PR-AUC como métrica principal de comparación, ya que se enfoca en el comportamiento del modelo sobre la clase positiva (fallas/anomalías) y resume el equilibrio entre Precision y Recall a lo largo de distintos thresholds. Posteriormente, Recall y Precision se utilizan para seleccionar el punto de operación: se busca mantener un Recall alto para no perder fallas reales y, entre las configuraciones que cumplen ese criterio, maximizar Precision para reducir falsas alarmas. Como métricas complementarias se registraron Accuracy, F1-score, Specificity, G-Mean y ROC-AUC, además de matrices de confusión y curvas PR/ROC.
 
-- unsupervised: utiliza todo X_train para ajustar el detector.
+### 9.2 Experimentos
 
-- semi_supervised: utiliza Machine failure únicamente para seleccionar las observaciones normales de train. La etiqueta no se utiliza como variable predictora. Validation y test conservan tanto casos normales como fallas.
+Se trabajaron dos enfoques (approach) de entrenamiento:
+
+- **unsupervised**: utiliza todo X_train para ajustar el detector.
+
+- **semi_supervised**: utiliza Machine failure únicamente para seleccionar las observaciones normales de train. La etiqueta no se utiliza como variable predictora. Validation y test conservan tanto casos normales como fallas.
 
 **Feature sets**
 Se evaluaron cuatro conjuntos de variables:
@@ -444,18 +479,20 @@ Se evaluaron cuatro conjuntos de variables:
 | engineered_only | Type más Temperature difference, Power y Torque_ToolWear_Product |
 | reduced | Subconjunto de variables originales y derivadas seleccionado durante la experimentación |
 
-Después del One-Hot Encoding de Type, este conjunto genera 6 variables procesadas.
+Después del One-Hot Encoding, Type se representa mediante 3 variables binarias.
 
 **Experimentos**
-| Experimento | Objetivo |
-|---|---|
-| Experiment 1 | Prueba inicial con ECOD y comparación de enfoques |
-| Experiment 2 | Comparación de ECOD, Isolation Forest, LOF y One-Class SVM con diferentes feature sets |
-| Experiment 3 | Búsqueda de hiperparámetros y comparación unsupervised vs semi_supervised |
-| Experiment 4 | Refinamiento de LOF y One-Class SVM |
-| Experiment 5 | Ajuste de threshold con Recall mínimo de 0.70 |
-| Experiment 6 | Construcción y comparación de ensembles LOF + One-Class SVM |
-| Model Registry Validation | Evaluación final de candidatos registrados sobre test |
+
+La experimentación se realizó de forma incremental. Cada etapa respondió a los resultados de la anterior:
+
+| Experimento | Objetivo | Resultado principal | Decisión para la siguiente etapa |
+|---|---|---|---|
+| **[Experimento 1](./src/training/experiment_1/README.md)** | Establecer un baseline con **ECOD** y comparar los enfoques **unsupervised** y **semi-supervised** usando el feature set **base** y contamination = 0.03. | El enfoque **semi-supervised** obtuvo mejor desempeño: **PR-AUC 0.2406 vs 0.2008** y **Recall 0.2407 vs 0.1852**, con una Precision prácticamente igual. | El resultado correspondía únicamente a una configuración inicial, por lo que **no se descartó ninguno de los dos enfoques**. Se decidió continuar comparando unsupervised y semi-supervised con otros algoritmos, feature sets e hiperparámetros. |
+| **[Experimento 2](./src/training/experiment_2/README.md)**  | Comparar **ECOD, Isolation Forest, LOF y One-Class SVM** con cuatro feature sets (**base, engineered, engineered_only y reduced**) bajo los enfoques unsupervised y semi-supervised, manteniendo hiperparámetros fijos. | Se evaluaron **32 combinaciones**. El enfoque **semi-supervised obtuvo mayor PR-AUC que unsupervised en los cuatro algoritmos**. LOF semi-supervised con engineered_only obtuvo el mejor resultado global (**PR-AUC 0.4666**), seguido por One-Class SVM (**0.4548**). El feature set **engineered_only** fue el más favorable en la mayoría de las comparaciones. | **No se descartó ningún enfoque ni algoritmo**, porque cada modelo se había probado con una configuración fija de hiperparámetros. Para el siguiente experimento se mantuvieron ambos enfoques y los cuatro algoritmos, pero se **eliminó únicamente el feature set base** y se inició el ajuste de hiperparámetros. |
+| **[Experimento 3](./src/training/experiment_3/README.md)** | Realizar un primer ajuste de hiperparámetros de los cuatro algoritmos, manteniendo la comparación entre unsupervised y semi-supervised y evaluando **engineered, engineered_only y reduced**. | Se evaluaron **144 configuraciones**. El enfoque **semi-supervised volvió a superar al unsupervised en PR-AUC para los cuatro algoritmos**. LOF con engineered_only y n_neighbors = 40 obtuvo el mayor PR-AUC (**0.4933**), seguido por One-Class SVM (**0.4837**). ECOD alcanzó **PR-AUC 0.4221**; Isolation Forest volvió a presentar los PR-AUC más bajos. | Se decidió continuar **únicamente con semi-supervised y engineered_only**. LOF y One-Class SVM pasaron a un refinamiento más específico. **ECOD se mantuvo como candidato**, pero sin una búsqueda extensa adicional; **Isolation Forest no se priorizó** en la siguiente etapa. |
+|**[Experimento 4](./src/training/experiment_4/README.md)**  | Refinar los hiperparámetros de **LOF y One-Class SVM** manteniendo **semi-supervised** y **engineered_only**. | En LOF, el PR-AUC aumentó hasta **0.5080 con n_neighbors = 80** y disminuyó ligeramente con 100 vecinos. Para un mismo n_neighbors, contamination no modificó el PR-AUC, sino el balance Recall–Precision. One-Class SVM alcanzó su mejor resultado con **nu = 0.015 y gamma = 0.61**, con **PR-AUC 0.4861**. | Se cerró el refinamiento de hiperparámetros. **LOF y One-Class SVM** se mantuvieron como candidatos. **ECOD se descartó para las siguientes etapas** porque su mejor PR-AUC previo quedó por debajo de los dos modelos refinados y no se identificaron hiperparámetros adicionales con potencial claro de mejora. La siguiente etapa fue el **ajuste del threshold** sobre validation. |
+| **[Experimento 5](./src/training/experiment_5/README.md)**  | Ajustar explícitamente el **threshold de decisión** de LOF y One-Class SVM sobre validation con el criterio **Recall ≥ 0.70 → mayor Precision → menor FPR**. | **LOF** mantuvo **PR-AUC 0.5080** y, con threshold **-0.0956**, obtuvo **Recall 0.7222, Precision 0.2889 y FPR 0.0664**. **One-Class SVM** mantuvo **PR-AUC 0.4861** y, con threshold **-0.3659**, obtuvo **Recall 0.7037, Precision 0.2197 y FPR 0.0934**. | Ambos modelos cumplieron el Recall mínimo. **LOF se mantuvo como principal candidato individual**, mientras que **One-Class SVM se mantuvo como candidato**. Estos dos modelos fueron utilizados posteriormente para evaluar ensembles. |
+| **[Experimento 6](./src/training/experiment_6/README.md)**  | Evaluar si la combinación de **LOF y One-Class SVM** mediante ensembles mejoraba la detección de anomalías, utilizando anomaly scores continuos y normalización **Min-Max** o **Percentile Rank**. | Se evaluaron **18 configuraciones de ensemble** con Weighted Average, Minimum y Cascada. La mejor configuración fue **Weighted Average + Min-Max**, con pesos **0.6 LOF / 0.4 One-Class SVM**, alcanzando **PR-AUC 0.5342, Recall 0.7037, Precision 0.3248 y FPR 0.0546**. | El ensemble **Weighted Average 0.6/0.4 con Min-Max** se mantuvo como candidato de ensemble para la **evaluación final sobre test**. |
 
 Los experimentos pueden ejecutarse desde la raíz del proyecto:
 
@@ -472,13 +509,13 @@ El detalle de la configuración, ejecución y resultados de cada experimento se 
 
 Por ejemplo:
 
-```text
-src/training/experiment_1/readme.md
-src/training/experiment_2/readme.md
-...
-src/training/experiment_6/readme.md
 
-```
+ [src/training/experiment_1/readme.md](./src/training/experiment_1/README.md) <br>
+ [src/training/experiment_2/readme.md](./src/training/experiment_2/README.md) <br>
+ [src/training/experiment_3/readme.md](./src/training/experiment_3/README.md) <br>
+ [src/training/experiment_4/readme.md](./src/training/experiment_4/README.md) <br>
+ [src/training/experiment_5/readme.md](./src/training/experiment_5/README.md) <br>
+ [src/training/experiment_6/readme.md](./src/training/experiment_6/README.md) 
 
 **Métricas comunes**
 
@@ -506,11 +543,8 @@ la matriz de confusión, curva PR-AUC Y ROC-AUC.
 
 Se registra un run adicional con el resumen de los experimentos y sus métricas en un archivo .csv para facilitar la comparación.
 
-PR-AUC es la métrica principal por el desbalance de clases.
 
 ### 9.2 Selección de modelos
-
-Debido al desbalance entre observaciones normales y fallas, **PR-AUC se utiliza como métrica principal de comparación**. 
 
 Los experimentos mostraron que el enfoque `semi_supervised` superaba al enfoque `unsupervised` en PR-AUC para los algoritmos evaluados y que el feature set `engineered_only` presentó los mejores resultados entre los conjuntos de variables comparados.
 
@@ -556,9 +590,9 @@ Sobre los scores normalizados se evaluaron tres estrategias:
 - **Minimum:** utiliza el menor score de ambos modelos.
 - **Cascada:** un modelo funciona como filtro inicial y el segundo evalúa las observaciones que superan el primer criterio.
 
-La mejor configuración fue Weighted Average con normalización Min-Max y pesos de 0.6 para LOF y 0.4 para One-Class SVM.
+La mejor configuración fue Weighted Average con normalización Min-Max y pesos de 0.6 para LOF y 0.4 para One-Class SVM, la cual fue seleccionada como candidato de validación.
 
-### 9.2.1 Candidatos de validación
+### 9.2.1 Candidatos seleccionados en validation
 
 | Modelo                       |     PR-AUC |     Recall |  Precision |        FPR |       
 | ---------------------------- | ---------: | ---------: | ---------: | ---------: | 
@@ -571,7 +605,7 @@ Los candidatos fueron registrados en Model Registry y posteriormente utilizados 
 
 ## 10. MLflow
 
-MLflow se utiliza para registrar los experimentos, parámetros, métricas, artefactos y modelos.
+MLflow se utiliza para registrar los experimentos, parámetros, métricas, artefactos y modelos. Su función principal en el proyecto es mantener trazabilidad entre datos, código, configuración, resultados y versiones del modelo, de modo que cada decisión de experimentación y promoción pueda reproducirse y auditarse.
 
 | Tipo | Elementos registrados |
 |---|---|
@@ -589,7 +623,9 @@ Los experimentos se registran en MLflow con los siguientes nombres:
 | Experimento 4 | Refinamiento de hiperparámetros | `04_hyperparameter_refinement_2` |
 | Experimento 5 | Ajuste de threshold | `05_threshold_tuning` |
 | Experimento 6 | Ensemble LOF + One-Class SVM | `06_ensemble` |
-| Model Registry Validation | Evaluación final de candidatos en test | `07_model_validation` |
+| Model Validation | Evaluación final de candidatos en test | `07_model_validation` |
+
+Durante la ejecución local, MLflow almacena los artefactos de los experimentos en `mlartifacts/`. Esta carpeta se genera automáticamente y no se versiona en GitHub
 
 ### 10.1 Iniciar MLflow
 
@@ -609,7 +645,7 @@ http://127.0.0.1:5000
 
 ### 10.2 Model Registry 
 
-Los modelos operacionales de los Experimentos 5 y 6 se registran en MLflow.
+Los modelos seleccionados como candidatos de los experimentos 5 y 6 se registran en MLflow.
 
 El registro de los candidatos se realiza mediante el script `register_candidates.py`, que identifica los runs correspondientes, registra las versiones en MLflow Model Registry y les asigna el alias `candidate`.
 
@@ -730,6 +766,8 @@ LOF, además de presentar una arquitectura más simple en comparación con el en
 
 One-Class SVM se descartó como modelo final porque presentó un desempeño inferior al de LOF y el ensemble en la evaluación sobre test, con menor Recall y una mayor tasa de falsos positivos.
 
+En el modelo LOF final se observó una disminución moderada entre validation y test: PR-AUC pasó de 0.5080 a 0.4921 y Recall de 0.7222 a 0.6792. Esta pérdida es esperable al evaluar datos no utilizados durante el ajuste y no muestra una caída abrupta del desempeño. Por ello, no se observó evidencia fuerte de sobreajuste, aunque esto no implica demostrar su ausencia absoluta.
+
 Configuración final:
 
 ```text
@@ -742,10 +780,7 @@ threshold = -0.0956274078
 ```
 La evaluación final de los modelos candidatos se documenta en la sección de Model Registry en el archivo README que se encuentra en la siguiente ruta:
 
-```text
-src/training/model_registry/readme.md
-```
-...
+[src/training/model_registry/readme.md](./src/training/model_registry/readme.md)
 
 
 ### 10.4 Promoción a producción
@@ -1059,7 +1094,7 @@ Swagger permanece disponible en:
 http://127.0.0.1:8000/docs
 ```
 
-LOF no produce probabilidades calibradas. La API devuelve un `anomaly_score`: cuanto mayor sea el valor, más inusual es el registro. La clasificación final se obtiene aplicando el threshold validado y almacenado dentro del modelo de producción.
+LOF genera un anomaly_score que representa qué tan inusual es una observación respecto al comportamiento aprendido por el modelo. Este valor no corresponde a una probabilidad de falla. La clasificación final se obtiene comparando el anomaly_score con el threshold seleccionado durante validation.
 
 ## 13. Pruebas automáticas
 
@@ -1184,19 +1219,19 @@ Las pruebas de monitoreo utilizan distribuciones sintéticas controladas y no de
 
 | Prueba | Qué verifica |
 |---|---|
-| `test_psi_es_cero_para_distribucion_identica` | PSI cercano a cero cuando producción coincide con referencia |
-| `test_psi_detecta_cambio_de_distribucion` | PSI crítico ante un desplazamiento extremo |
-| `test_js_es_cero_para_distribucion_identica` | Jensen-Shannon cercano a cero para proporciones iguales |
-| `test_js_detecta_cambio_categorico` | Detección de cambio en la mezcla de categorías |
-| `test_system_monitoring_calcula_metricas_y_error` | Latencia, errores, disponibilidad y volumen |
-| `test_data_monitoring_exige_muestra_minima` | No declarar drift con menos de 30 registros |
-| `test_model_monitoring_exige_muestra_minima` | No evaluar el modelo con una muestra insuficiente |
-| `test_model_monitoring_estable_con_referencia` | Estado estable cuando tasa y scores coinciden |
-| `test_reentrenamiento_continua_sin_drift_critico` | Sin drift crítico se continúa monitoreando |
-| `test_reentrenamiento_investiga_drift_sin_ground_truth` | Drift crítico sin etiquetas reales requiere investigación, no reentrenamiento |
-| `test_reentrenamiento_no_se_recomienda_si_performance_se_mantiene` | Drift crítico con Recall aceptable no recomienda reentrenamiento |
-| `test_reentrenamiento_se_evalua_si_drift_y_performance_degradado` | Drift crítico y Recall por debajo del límite recomiendan evaluar reentrenamiento |
-| `test_reentrenamiento_se_evalua_en_limite_exacto` | Una caída exactamente igual al 10% activa la evaluación de reentrenamiento |
+| test_psi_es_cero_para_distribucion_identica | PSI cercano a cero cuando producción coincide con referencia |
+| test_psi_detecta_cambio_de_distribucion | PSI crítico ante un desplazamiento extremo |
+| test_js_es_cero_para_distribucion_identica | Jensen-Shannon cercano a cero para proporciones iguales |
+| test_js_detecta_cambio_categorico | Detección de cambio en la mezcla de categorías |
+| test_system_monitoring_calcula_metricas_y_error | Latencia, errores, disponibilidad y volumen |
+| test_data_monitoring_exige_muestra_minima | No declarar drift con menos de 30 registros |
+| test_model_monitoring_exige_muestra_minima | No evaluar el modelo con una muestra insuficiente |
+| test_model_monitoring_estable_con_referencia | Estado estable cuando tasa y scores coinciden |
+| test_reentrenamiento_continua_sin_drift_critico | Sin drift crítico se continúa monitoreando |
+| test_reentrenamiento_investiga_drift_sin_ground_truth | Drift crítico sin etiquetas reales requiere investigación, no reentrenamiento |
+| test_reentrenamiento_no_se_recomienda_si_performance_se_mantiene | Drift crítico con Recall aceptable no recomienda reentrenamiento |
+| test_reentrenamiento_se_evalua_si_drift_y_performance_degradado | Drift crítico y Recall por debajo del límite recomiendan evaluar reentrenamiento |
+| test_reentrenamiento_se_evalua_en_limite_exacto | Una caída exactamente igual al 10% activa la evaluación de reentrenamiento |
 
 ### 13.5 Ejecución de las pruebas
 
@@ -1937,7 +1972,7 @@ La simulación se encuentra en:
 src/validation/simulate_quality_issues.py
 ```
 
-El script toma una muestra reproducible del dataset original, crea una batch a partir del dataset original y agrega intencionalmente diferentes problemas de calidad. El archivo original `data/raw/ai4i2020.csv` no se modifica.
+El script toma una muestra reproducible del dataset original, crea una copia del batch y agrega intencionalmente diferentes problemas de calidad. El archivo original `data/raw/ai4i2020.csv` no se modifica.
 
 La configuración utilizada para esta prueba se encuentra en:
 
@@ -2036,25 +2071,122 @@ La contaminación constituye únicamente una prueba controlada del pipeline. El 
 
 ## 17. Results
 
-El modelo seleccionado para producción fue **LOF**, utilizando el conjunto de características `engineered_only` y el enfoque `semi_supervised`.
+La evaluación final se realizó sobre el conjunto de `test`, que se mantuvo reservado durante la experimentación, el ajuste de hiperparámetros y la selección de thresholds.
+
+Los resultados de los tres candidatos fueron:
+
+| Modelo | PR-AUC | Recall | Precision | FPR |
+|---|---:|---:|---:|---:|
+| LOF | 0.4921 | **0.6792** | 0.2535 | 0.0733 |
+| One-Class SVM | 0.4653 | 0.5849 | 0.1902 | 0.0912 |
+| Ensemble LOF + One-Class SVM | **0.5116** | 0.6415 | **0.2857** | **0.0587** |
+
+El ensemble obtuvo el mayor PR-AUC y la mejor Precision, además del menor FPR. Sin embargo, LOF alcanzó el mayor Recall, con 0.6792, por lo que fue el modelo que identificó la mayor proporción de fallas reales en test.
+
+La diferencia de PR-AUC entre el ensemble y LOF fue de aproximadamente 0.02. Esta mejora se consideró limitada frente al aumento de complejidad operativa del ensemble, que requiere mantener dos modelos, normalizar sus anomaly scores, combinar sus resultados y conservar una configuración adicional de pesos y threshold.
+
+Por esta razón, se seleccionó **LOF como modelo final de producción**, priorizando el Recall y una arquitectura más simple para despliegue, mantenimiento y monitoreo.
+
+### Interpretación operativa
+
+El Recall de 0.6792 indica que LOF logró identificar aproximadamente el 68 % de las fallas presentes en el conjunto de test.
+
+La Precision de 0.2535 significa que aproximadamente una de cada cuatro alertas generadas correspondió a una falla real. En este proyecto se priorizó Recall porque el objetivo es utilizar el modelo como un mecanismo de alerta temprana y priorización de revisiones, aceptando una mayor cantidad de falsas alertas para reducir el riesgo de dejar pasar una posible falla.
+
+Esta decisión debe interpretarse desde el contexto operativo: el modelo no sustituye el diagnóstico de mantenimiento, sino que ayuda a identificar qué condiciones o equipos deberían revisarse con mayor prioridad.
+
+En una implementación industrial real, el threshold debería ajustarse considerando el costo relativo de:
+- una inspección preventiva;
+- una falsa alerta;
+- una falla no detectada;
+- una parada de producción;
+- posibles daños a la maquinaria.
+
+### Generalización
+
+LOF presentó una disminución moderada entre validation y test:
 
 | Etapa | PR-AUC | Recall | Precision | FPR |
 |---|---:|---:|---:|---:|
 | Validation | 0.5080 | 0.7222 | 0.2889 | 0.0664 |
 | Test | 0.4921 | 0.6792 | 0.2535 | 0.0733 |
 
-El modelo quedó registrado en MLflow Model Registry como:
+El PR-AUC disminuyó de 0.5080 a 0.4921 y el Recall de 0.7222 a 0.6792. La reducción no fue abrupta y el modelo mantuvo un comportamiento similar sobre datos no utilizados durante el ajuste, por lo que no se observó evidencia fuerte de sobreajuste.
+
+### Modelo de producción
+
+La configuración final fue:
 
 ```text
-ai4i_lof_threshold_tuned
-
+Modelo = LOF
+n_neighbors = 80
+contamination = 0.03
+feature_set = engineered_only
+approach = semi_supervised
+threshold = -0.0956274078
 ```
+
+### 17.1 Conclusiones
+
+- La solución desarrollada permite identificar comportamientos anómalos en las condiciones de operación de la maquinaria y generar alertas que pueden apoyar una detección más temprana de posibles fallas.
+
+- El ajuste del threshold permitió definir un punto de operación orientado a detectar la mayor cantidad posible de fallas incrementando lo menos posible las falsas alertas.
+
+- El modelo seleccionado para producción fue LOF, ya que ofreció el mejor equilibrio entre capacidad de detección y simplicidad operativa. En test alcanzó un Recall de 0.6792. La estrategia de selección priorizó la capacidad de detectar fallas reales, aceptando una mayor cantidad de falsas alertas. Este enfoque busca reducir el riesgo asociado con dejar pasar fallas especialmente en escenarios de producción donde generalmente una falla de maquinaria puede provocar daños, interrupciones del proceso y costos mayores en comparación con el costo de enviar un técnico a revisar el estado de la máquina.
+
+- La Precision de 0.2535 muestra que aproximadamente una de cada cuatro alertas corresponde a una falla real. Por lo tanto, la solución no pretende sustituir el diagnóstico técnico, sino funcionar como un mecanismo de alerta y priorización, ayudando a identificar qué equipos o condiciones requieren revisión.
+
+- La implementación de la API, el procesamiento por lotes y la contenerización con Docker permiten integrar el modelo en un flujo operativo y utilizarlo tanto para evaluaciones individuales como para múltiples máquinas.
+
+- La implementación de Data Quality Gates, monitoreo y alertas permite detectar problemas en los datos o cambios en las condiciones de operación antes de asumir que el modelo se ha degradado. Esto reduce el riesgo de reentrenar innecesariamente y permite investigar primero si el cambio se debe a nuevas condiciones operativas, problemas de calidad o fallos en los sensores.
+
+- La estrategia de reentrenamiento se diseñó de forma controlada: un cambio en la distribución de los datos no activa automáticamente un nuevo entrenamiento. La decisión se basa en evidencia de drift y, cuando existe ground truth, en la degradación del desempeño del modelo.
+
+- La solución proporciona trazabilidad mediante MLflow, versionado de datos, artefactos, pruebas automatizadas y reportes, facilitando la revisión de decisiones y el mantenimiento del modelo a lo largo de su ciclo de vida.
+
+- Para una implementación industrial real, el siguiente paso sería validar la solución con datos productivos y cuantificar los costos asociados con falsas alertas, fallas no detectadas, inspecciones y paradas de producción. Con esta información sería posible ajustar el threshold de acuerdo con el impacto económico real para el negocio.
+
+### 17.2 Limitaciones
+
+Aunque la solución implementa el ciclo completo de experimentación, despliegue y monitoreo, existen limitaciones que deben considerarse al interpretar los resultados.
+
+* Dataset y generalización
+
+El proyecto utiliza el dataset AI4I 2020 Predictive Maintenance, por lo que los resultados obtenidos corresponden a las características y distribución de este conjunto de datos. La capacidad del modelo para generalizar a maquinaria, procesos industriales o condiciones operativas diferentes no ha sido validada con datos externos.
+
+Además, las fallas representan una proporción reducida del dataset, lo que limita la cantidad de ejemplos anómalos disponibles para validation y test y hace que las métricas asociadas con la clase minoritaria puedan ser sensibles a cambios en el número de fallas detectadas.
+
+* Desempeño del modelo
+
+El modelo LOF seleccionado obtuvo un Recall de 0.6792 en test, por lo que logró identificar aproximadamente el 68% de las fallas presentes en el conjunto de prueba. La Precision fue de 0.2535, lo que significa que aproximadamente una de cada cuatro alertas generadas correspondió a una falla real.
+
+Este balance responde al criterio adoptado en el proyecto de priorizar la detección de posibles fallas, aceptando una mayor cantidad de falsas alertas a cambio de reducir el riesgo de que una condición anómala pase desapercibida. Desde una perspectiva de negocio, esta decisión puede ser razonable cuando el costo potencial de una falla no detectada —como daño de maquinaria, interrupción del proceso o pérdida de producción— es mayor que el costo de realizar una inspección preventiva que finalmente no encuentre una falla.
+
+Sin embargo, estos costos no forman parte del dataset y no fueron cuantificados en el proyecto. En una implementación real, el threshold debería ajustarse considerando el costo de las inspecciones, las falsas alertas, las fallas no detectadas y el impacto de una parada de producción.
+
+* Monitoreo
+
+El monitoreo implementado utiliza perfiles de referencia y thresholds definidos para demostrar el comportamiento del sistema. Los límites utilizados para PSI y otras métricas son criterios operativos del proyecto y no deben considerarse valores universales.
+
+En un entorno productivo real, estos thresholds deberían revisarse utilizando historial de producción, conocimiento del proceso, variabilidad natural de la maquinaria y el impacto operativo de las alertas.
+
+Además, mientras no exista ground truth de producción, el sistema puede detectar cambios en las distribuciones de los datos, pero no puede determinar directamente si el desempeño real del modelo se ha degradado. Por esta razón, el drift por sí solo no implica reentrenamiento.
+
+* Simulación de producción y drift
+
+La evaluación de drift se realizó mediante una simulación controlada. Los Production Batches utilizan una muestra reproducible y modifican progresivamente `Air temperature` para comprobar que PSI pueda identificar estados stable, warning y critical.
+
+Esta prueba demuestra el funcionamiento técnico del mecanismo de detección, pero no representa todos los tipos de drift que podrían ocurrir en producción. En un escenario real podrían cambiar simultáneamente múltiples variables, categorías, relaciones entre características o condiciones de operación.
+
+* Despliegue
+
+La API y el contenedor Docker permiten ejecutar el modelo y el monitoreo en un entorno reproducible, pero el proyecto no ha sido evaluado bajo carga productiva real ni integrado con sensores, sistemas de adquisición de datos o infraestructura industrial. Por lo tanto, aspectos como escalabilidad, disponibilidad a largo plazo, seguridad, autenticación, persistencia centralizada de logs y recuperación ante fallos requerirían trabajo adicional antes de considerar la solución lista para un entorno productivo real.
+
 ## 18. Team
 
 | Integrante | Participación |
 |---|---|
 | Byron | Configuración del repositorio Git, ingesta reproducible, diagnóstico de calidad, Data Quality Gates, integración y verificación del pipeline, ejecución reproducible de experimentos en MLflow, exportación del modelo de producción, desarrollo de la API con FastAPI, predicción individual y por lotes, interfaz web, contenerización con Docker, recolección de eventos, System Monitoring, Data Monitoring, Model Monitoring, alertas, recomendación controlada de reentrenamiento, panel visual de monitoreo, simulación reproducible de producción y drift, generación de Production Batches, detección progresiva mediante PSI, justificación de thresholds, generación de evidencias, pruebas automatizadas de monitoreo y drift, y documentación de ejecución. |
-
 | Dayana | Análisis exploratorio de datos, definición y validación de decisiones de limpieza y preprocesamiento, ingeniería de características, diseño del pipeline de preprocesamiento, definición de los enfoques unsupervised y semi-supervised, selección y comparación de feature sets, implementación y comparación de detectores de anomalías, ajuste de hiperparámetros y thresholds, análisis de métricas y selección de criterios de evaluación, comparación de LOF, One-Class SVM y ensambles, evaluación de modelos sobre validation y test, selección y justificación del modelo final de producción, registro y automatización del flujo de MLflow Model Registry, validación y promoción de candidatos, pruebas automatizadas de datos, modelo, API y lógica de reentrenamiento, definición de la estrategia de reentrenamiento basada en drift y degradación del Recall, actualización de la documentación técnica |
 
 Los integrantes no trabajan en ramas personales. Cada tarea se desarrolla en una rama `feature/...` creada desde `develop`.
