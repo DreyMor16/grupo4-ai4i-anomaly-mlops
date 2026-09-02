@@ -51,30 +51,47 @@ La fuente y las reglas para trabajar con los datos están explicadas en [`data/R
 
 ## 3. Architecture
 
-El proyecto deberá seguir este recorrido:
+La solución está organizada en componentes independientes que cubren el ciclo completo de MLOps:
 
 ```text
-Datos originales
-      ↓
-Ingesta y validación
-      ↓
-EDA, feature engineering y preprocesamiento
-      ↓
-Entrenamiento y experimentación
-      ↓
-MLflow Tracking
-      ↓
-Model Registry
-candidate → validation → production
-      ↓
-API dentro de Docker
-      ↓
-Monitoreo y alertas
-      ↓
-Decisión de reentrenamiento
+Sistema MLOps AI4I
+├── Datos e ingesta
+│   ├── Dataset AI4I 2020 de UCI
+│   ├── Ingesta reproducible
+│   └── Dataset raw identificado mediante SHA-256
+├── Calidad y preparación
+│   ├── Data Quality Gates
+│   ├── Diagnóstico y EDA
+│   └── Feature engineering y preprocesamiento reutilizable
+├── Experimentación
+│   ├── Entrenamiento de detectores de anomalías
+│   ├── Seguimiento de experimentos con MLflow
+│   └── Model Registry: candidate, validation y production
+├── Despliegue
+│   ├── Bundle de modelo, preprocessor y metadata
+│   ├── API de inferencia con FastAPI
+│   └── Contenedor Docker
+└── Operación
+    ├── Recolección de eventos
+    ├── System, Data y Model Monitoring
+    ├── Alertas y simulación de drift
+    └── Estrategia controlada de reentrenamiento
 ```
 
-Cada parte del dibujo deberá corresponder con código real dentro del repositorio.
+Cada componente de la arquitectura corresponde con una implementación del repositorio:
+
+| Componente | Implementación |
+|---|---|
+| Ingesta | `src/ingestion/ingest.py` |
+| Validación de calidad | `src/validation/validate.py` |
+| EDA | `notebooks/` |
+| Feature engineering | `src/feature_engineering/preprocessing.py` |
+| Entrenamiento | `src/training/` |
+| MLflow Model Registry | `src/training/model_registry/` |
+| API | `src/api/` |
+| Docker | `Dockerfile` |
+| Monitoreo y drift | `src/monitoring/` |
+| Pruebas automatizadas | `tests/` |
 
 ## 4. Repository Structure
 
@@ -1057,7 +1074,8 @@ tests/
 ├── model/
 │   └── test_model.py
 └── monitoring/
-    └── test_monitoring.py
+    ├── test_monitoring.py
+    └── test_drift_simulation.py
 ```
 
 ### 13.1 Pruebas de la API
@@ -1093,13 +1111,14 @@ Antes de ejecutar las pruebas que requieren inferencia, se consulta el endpoint 
 | test_health_responde_200 | Comprueba que el servicio esté listo para inferencia. | Modelo y preprocessor cargados. | HTTP 200 y status ok. |
 | test_predict_con_input_valido_responde_200 | Verifica una inferencia válida. | Request completo y con valores válidos. | HTTP 200. |
 | test_predict_respeta_el_schema_de_respuesta | Comprueba la estructura de la respuesta. | Request válido. | anomaly, prediction, anomaly_score, model_name y model_version. |
-| test_prediccion_es_valida | Verifica que la salida binaria del detector sea válida. | Request válido. | prediction solo puede tomar los valores 0 o 1. |
+| test_prediccion_valida | Verifica que la salida binaria del detector sea válida. | Request válido. | prediction solo puede tomar los valores 0 o 1. |
 | test_falta_una_variable_obligatoria | Comprueba un request incompleto e identifica el campo faltante. | Se elimina Torque del request. | HTTP 422 y el detalle del error debe indicar Torque. |
 | test_tipo_de_dato_incorrecto | Verifica el rechazo de un tipo de dato incorrecto e identifica el campo afectado. | Se envía texto en Torque. | HTTP 422 y el detalle del error debe indicar Torque. |
 | test_tipo_invalido | Verifica el rechazo de una categoría no permitida e identifica el campo afectado. | Se envía Type = X. | HTTP 422 y el detalle del error debe indicar Type. |
 | test_valor_fuera_de_rango_negativo | Comprueba valores físicamente inválidos. | Rotational speed negativa. | HTTP 422. |
 | test_body_vacio | Verifica un request sin datos. | Body vacío. | HTTP 422. |
 | test_mensaje_de_error_es_informativo | Comprueba que el error identifique el campo problemático. | Rotational speed inválida. | HTTP 422 con detalle del campo. |
+| test_predict_batch_rechaza_filas_duplicadas | Verifica que un lote con registros idénticos sea bloqueado. | Dos instancias iguales. | HTTP 422 con detalle de las filas duplicadas. |
 
 ### 13.2 Pruebas de datos
 
@@ -1175,6 +1194,7 @@ Las pruebas de monitoreo utilizan distribuciones sintéticas controladas y no de
 | `test_reentrenamiento_investiga_drift_sin_ground_truth` | Drift crítico sin etiquetas reales requiere investigación, no reentrenamiento |
 | `test_reentrenamiento_no_se_recomienda_si_performance_se_mantiene` | Drift crítico con Recall aceptable no recomienda reentrenamiento |
 | `test_reentrenamiento_se_evalua_si_drift_y_performance_degradado` | Drift crítico y Recall por debajo del límite recomiendan evaluar reentrenamiento |
+| `test_reentrenamiento_se_evalua_en_limite_exacto` | Una caída exactamente igual al 10% activa la evaluación de reentrenamiento |
 
 ### 13.5 Ejecución de las pruebas
 
@@ -1213,7 +1233,7 @@ Una vez disponibles los datos y artefactos necesarios, todas las pruebas pueden 
 python -m pytest tests/ -v
 ```
 
-La suite completa contiene 74 pruebas automatizadas.
+La suite completa contiene 77 pruebas automatizadas.
 
 También pueden ejecutarse por componente:
 
@@ -1865,7 +1885,7 @@ python -m pytest -q
 Resultado validado:
 
 ```text
-74 passed
+77 passed
 ```
 
 ### 15.11 Interpretación y respuesta operativa
