@@ -23,6 +23,7 @@ El flujo Git utilizado es:
 ```text
 feature/<tarea> → develop → main
 ```
+> Consulta la [guía rápida de reproducción](REPRODUCIR.md) para reconstruir y ejecutar el proyecto desde cero.
 
 ## 1. Business Problem
 
