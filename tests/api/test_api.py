@@ -109,15 +109,15 @@ def test_prediccion_valida(client):
 
 # ---------- INPUT INVÁLIDO: qué debe pasar en cada caso ----------
 
-def test_tipo_de_dato_incorrecto(client):
-    """Mandar texto donde se espera un número y verificar el campo reportado."""
+def test_falta_una_variable_obligatoria(client):
+    """Un campo requerido ausente debe producir HTTP 422."""
 
     input_invalido = INPUT_VALIDO.copy()
-    input_invalido["Torque"] = "cuarenta"
+    input_invalido.pop("Torque")
 
     resp = client.post(
         "/predict",
-        json=input_invalido
+        json=input_invalido,
     )
 
     assert resp.status_code == 422
@@ -150,7 +150,7 @@ def test_tipo_de_dato_incorrecto(client):
         for error in detalle
     )
 
-def test_tipo__invalido(client):
+def test_tipo_invalido(client):
     """Type solo puede tomar los valores L, M o H y debe reportarse si es inválido."""
 
     input_invalido = INPUT_VALIDO.copy()
