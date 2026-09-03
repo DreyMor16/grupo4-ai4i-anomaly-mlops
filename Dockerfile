@@ -1,27 +1,43 @@
 FROM python:3.13-slim
 
 LABEL org.opencontainers.image.title="Grupo 4 AI4I Anomaly API"
-LABEL org.opencontainers.image.description="API de inferencia para detección de anomalías en maquinaria"
+LABEL org.opencontainers.image.description="API y monitoreo para detección de anomalías en maquinaria"
 
 # Configuración del entorno de ejecución.
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    MODEL_BUNDLE_PATH=/app/artifacts/production
+    MODEL_BUNDLE_PATH=/app/artifacts/production \
+    MONITORING_LOG_DIR=/app/logs/monitoring
 
 WORKDIR /app
 
-# Instalar únicamente las dependencias necesarias para servir el modelo.
+# Instalar únicamente las dependencias necesarias para servir
+# y monitorear el modelo.
+
 COPY requirements-serving.txt .
+
 RUN python -m pip install --upgrade pip \
     && python -m pip install -r requirements-serving.txt
 
-# Copiar el código y el bundle exportado desde MLflow.
+# Copiar la API, el monitoreo, su configuración y el bundle
+# exportado desde MLflow.
+
 COPY src ./src
+
+COPY config/monitoring_reference.json \
+    config/monitoring_thresholds.json \
+    ./config/
+
 COPY artifacts/production ./artifacts/production
 
-# Ejecutar el servicio con un usuario sin privilegios.
+# Crear los directorios persistentes y ejecutar el servicio
+# con un usuario sin privilegios.
+
 RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p /app/logs/monitoring \
+    && mkdir -p /app/reports/monitoring \
     && chown -R appuser:appuser /app
 
 USER appuser

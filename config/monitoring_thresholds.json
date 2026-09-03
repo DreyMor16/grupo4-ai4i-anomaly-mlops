@@ -1,0 +1,29 @@
+{
+  "window_hours": 24,
+  "minimum_production_rows_for_drift": 30,
+  "system": {
+    "max_error_rate_warning": 0.03,
+    "max_error_rate_critical": 0.05,
+    "min_availability_warning": 0.99,
+    "min_availability_critical": 0.95,
+    "max_p95_latency_ms_warning": 300,
+    "max_p95_latency_ms_critical": 500
+  },
+  "data": {
+    "psi_warning": 0.1,
+    "psi_critical": 0.2,
+    "js_warning": 0.05,
+    "js_critical": 0.1
+  },
+  "model": {
+    "anomaly_rate_difference_warning": 0.03,
+    "anomaly_rate_difference_critical": 0.05,
+    "score_mean_shift_warning": 1,
+    "score_mean_shift_critical": 2
+  },
+  "retraining": {
+    "performance_metric": "recall",
+    "reference_performance": 0.6792,
+    "maximum_relative_drop": 0.10
+  }
+}
