@@ -457,7 +457,7 @@ El `preprocessor` utilizado para preparar nuevos datos debe ser exactamente el m
 
 ## 9. Train 
 
-### 9.1 Criterios de evaluación 
+### 9.1 Criterios de evaluación
 
 El dataset presenta un fuerte desbalance entre observaciones normales y fallas, por lo que métricas generales como Accuracy pueden dar una impresión engañosa del desempeño al estar dominadas por la clase mayoritaria. Por esta razón, se utiliza PR-AUC como métrica principal de comparación, ya que se enfoca en el comportamiento del modelo sobre la clase positiva (fallas/anomalías) y resume el equilibrio entre Precision y Recall a lo largo de distintos thresholds. Posteriormente, Recall y Precision se utilizan para seleccionar el punto de operación: se busca mantener un Recall alto para no perder fallas reales y, entre las configuraciones que cumplen ese criterio, maximizar Precision para reducir falsas alarmas. Como métricas complementarias se registraron Accuracy, F1-score, Specificity, G-Mean y ROC-AUC, además de matrices de confusión y curvas PR/ROC.
 
@@ -515,7 +515,7 @@ Por ejemplo:
  [src/training/experiment_3/readme.md](./src/training/experiment_3/README.md) <br>
  [src/training/experiment_4/readme.md](./src/training/experiment_4/README.md) <br>
  [src/training/experiment_5/readme.md](./src/training/experiment_5/README.md) <br>
- [src/training/experiment_6/readme.md](./src/training/experiment_6/README.md) 
+ [src/training/experiment_6/readme.md](./src/training/experiment_6/README.md)
 
 **Métricas comunes**
 
